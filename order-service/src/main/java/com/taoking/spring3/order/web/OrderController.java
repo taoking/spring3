@@ -2,6 +2,8 @@ package com.taoking.spring3.order.web;
 
 import com.taoking.spring3.common.dto.OrderPreviewRequest;
 import com.taoking.spring3.common.dto.OrderPreviewResponse;
+import com.taoking.spring3.order.config.CatalogClientProperties;
+import com.taoking.spring3.order.config.OrderProperties;
 import com.taoking.spring3.order.service.OrderService;
 import jakarta.validation.Valid;
 import java.util.Map;
@@ -18,9 +20,17 @@ import org.springframework.web.bind.annotation.RestController;
 class OrderController {
 
     private final OrderService orderService;
+    private final OrderProperties orderProperties;
+    private final CatalogClientProperties catalogClientProperties;
 
-    OrderController(OrderService orderService) {
+    OrderController(
+            OrderService orderService,
+            OrderProperties orderProperties,
+            CatalogClientProperties catalogClientProperties
+    ) {
         this.orderService = orderService;
+        this.orderProperties = orderProperties;
+        this.catalogClientProperties = catalogClientProperties;
     }
 
     @PostMapping("/preview")
@@ -37,7 +47,9 @@ class OrderController {
     Map<String, Object> stats() {
         return Map.of(
                 "service", "order-service",
-                "status", "ready"
+                "status", "ready",
+                "currency", orderProperties.currency(),
+                "catalogBaseUrlConfigured", catalogClientProperties.hasBaseUrl()
         );
     }
 

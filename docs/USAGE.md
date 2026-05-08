@@ -226,7 +226,7 @@ docker compose -f observability/docker-compose.yml down
 
 ## Nacos
 
-Nacos 是可选专题，默认 profile 不依赖 Nacos。
+Nacos 是可选专题，默认 profile 不依赖 Nacos。只有同时使用 Maven `-Pnacos` 和 Spring `SPRING_PROFILES_ACTIVE=nacos` 时才启用 Nacos。
 
 校验配置：
 
@@ -240,16 +240,80 @@ docker compose -f platform/nacos/docker-compose.yml config
 docker compose -f platform/nacos/docker-compose.yml up -d
 ```
 
+写入示例配置：
+
+```bash
+curl -fsS -X POST 'http://127.0.0.1:8848/nacos/v1/cs/configs' \
+  --data-urlencode 'dataId=order-service.yml' \
+  --data-urlencode 'group=DEFAULT_GROUP' \
+  --data-urlencode 'content=demo:
+  order:
+    currency: NCS'
+
+curl -fsS -X POST 'http://127.0.0.1:8848/nacos/v1/cs/configs' \
+  --data-urlencode 'dataId=catalog-service.yml' \
+  --data-urlencode 'group=DEFAULT_GROUP' \
+  --data-urlencode 'content=demo:
+  catalog:
+    slow-delay: 1s'
+```
+
+打包：
+
+```bash
+./mvnw -Pnacos package -DskipTests
+```
+
+前台启动：
+
+```bash
+SPRING_PROFILES_ACTIVE=nacos java -jar catalog-service/target/catalog-service-0.0.1-SNAPSHOT.jar
+```
+
+```bash
+SPRING_PROFILES_ACTIVE=nacos java -jar order-service/target/order-service-0.0.1-SNAPSHOT.jar
+```
+
+后台启动：
+
+```bash
+screen -dmS spring3-nacos-catalog zsh -lc 'SPRING_PROFILES_ACTIVE=nacos java -jar catalog-service/target/catalog-service-0.0.1-SNAPSHOT.jar > catalog-service/target/nacos-run.log 2>&1'
+screen -dmS spring3-nacos-order zsh -lc 'SPRING_PROFILES_ACTIVE=nacos java -jar order-service/target/order-service-0.0.1-SNAPSHOT.jar > order-service/target/nacos-run.log 2>&1'
+```
+
 查看状态和日志：
 
 ```bash
 docker compose -f platform/nacos/docker-compose.yml ps
 docker logs -f spring3-nacos
+tail -f catalog-service/target/nacos-run.log
+tail -f order-service/target/nacos-run.log
+```
+
+验证注册发现：
+
+```bash
+curl -fsS 'http://127.0.0.1:8848/nacos/v1/ns/instance/list?serviceName=catalog-service'
+curl -fsS 'http://127.0.0.1:8848/nacos/v1/ns/instance/list?serviceName=order-service'
+```
+
+验证配置读取和服务名调用：
+
+```bash
+curl -u admin:admin123 http://localhost:8080/api/orders/admin/stats
+curl -u admin:admin123 http://localhost:8081/api/catalog/admin/stats
+
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8080/api/orders/preview
 ```
 
 停止：
 
 ```bash
+screen -S spring3-nacos-catalog -X quit
+screen -S spring3-nacos-order -X quit
 docker compose -f platform/nacos/docker-compose.yml down
 ```
 

@@ -10,7 +10,7 @@
 
 | 优先级 | 专题 | 原因 | 当前处理 |
 | --- | --- | --- | --- |
-| P0 | Nacos 注册中心/配置中心 | 微服务面试高频，常和 Spring Cloud Alibaba、OpenFeign、配置刷新一起问 | 已新增专题手册和本地 Docker 配置，后续做可选 profile |
+| P0 | Nacos 注册中心/配置中心 | 微服务面试高频，常和 Spring Cloud Alibaba、OpenFeign、配置刷新一起问 | 已完成可选 `nacos` profile、服务注册发现、启动期配置中心读取；后续深化动态刷新和环境隔离 |
 | P0 | Spring Cloud Gateway | 网关路由、过滤器、鉴权透传、限流、fallback 常在微服务架构题出现 | 后续可加独立 `gateway-service` |
 | P0 | 链路追踪 | 资深面试会问 metrics/logs/traces 三件套，不只问 Prometheus | 当前只有指标，后续补 Micrometer Tracing + OpenTelemetry/Zipkin/Tempo |
 | P0 | RestClient / `@HttpExchange` | Spring 原生 HTTP client 是 OpenFeign 的重要对比项 | 后续补一套调用示例并沉淀选型说明 |

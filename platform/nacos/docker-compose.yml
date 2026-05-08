@@ -4,6 +4,7 @@ services:
     container_name: spring3-nacos
     environment:
       MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
       NACOS_AUTH_TOKEN: U3ByaW5nM0xlYXJuaW5nTmFjb3NUb2tlblNlY3JldEtleU11c3RCZUxvbmdlclRoYW4zMkNoYXJhY3RlcnM=
       NACOS_AUTH_IDENTITY_KEY: spring3
       NACOS_AUTH_IDENTITY_VALUE: spring3-local

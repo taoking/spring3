@@ -9,6 +9,13 @@ spring:
     caffeine:
       spec: maximumSize=100,expireAfterWrite=5m,recordStats
   cloud:
+    nacos:
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+      discovery:
+        enabled: false
     openfeign:
       circuitbreaker:
         enabled: true

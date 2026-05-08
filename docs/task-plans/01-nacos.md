@@ -4,6 +4,20 @@
 
 把 Nacos 从“文档专题”推进到“可选运行专题”：在 `nacos` profile 下启用服务注册发现和配置中心，默认 profile 继续不依赖 Nacos。
 
+## 当前状态
+
+已实现。后续如果继续扩展，可以补充动态刷新演示、Nacos namespace/group 多环境隔离和 Testcontainers 集成测试。
+
+## 验证记录
+
+- `./mvnw test` 通过，默认 profile 不依赖 Nacos。
+- `./mvnw -Pnacos test` 通过，Nacos 可选依赖不会破坏默认 Spring profile。
+- `./mvnw -Pnacos package -DskipTests` 通过，可构建带 Nacos 依赖的服务包。
+- `docker compose -f platform/nacos/docker-compose.yml config` 通过。
+- 本地 Nacos 3.0.3 启动后，`catalog-service` 和 `order-service` 在 `SPRING_PROFILES_ACTIVE=nacos` 下均可注册到 Nacos。
+- 已通过 Nacos Config 写入 `order-service.yml`、`catalog-service.yml` 并验证启动期配置读取：`order-service` 返回 `currency=NCS`，`catalog-service` 返回 `slowDelay=PT1S`。
+- 已验证 `order-service` 在未配置固定 `demo.clients.catalog.base-url` 时，通过服务名 `catalog-service` 调用 catalog API。
+
 ## 任务 Prompt
 
 ```text

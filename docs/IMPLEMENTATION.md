@@ -41,6 +41,7 @@
 - 观测：Actuator、Micrometer、Prometheus registry、自定义 Counter。
 - 错误上报：Sentry Jakarta starter，DSN 通过环境变量读取。
 - API 文档：SpringDoc OpenAPI / Swagger UI。
+- Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
 
 ## 运行方式
 
@@ -89,15 +90,17 @@ docker compose -f observability/docker-compose.yml up
 
 Prometheus 使用 `host.docker.internal` 抓取宿主机上的两个 Spring Boot 服务。
 
-## Nacos 补充计划
+## Nacos 可选专题
 
 Nacos 属于面试和微服务实践高频内容，已补充为可选专题：
 
 - 本地 Docker Compose：`platform/nacos/docker-compose.yml`
 - 专题手册：`docs/nacos-playbook.md`
 - 面试路线：`docs/interview-roadmap.md`
+- 可选依赖：`-Pnacos`
+- Spring profile：`SPRING_PROFILES_ACTIVE=nacos`
 
-当前不把 Nacos 加入默认运行依赖，避免学习项目启动门槛变高。后续如果实现代码接入，应使用 `nacos` profile，默认 profile 仍然保持不需要 Nacos。
+当前不把 Nacos 加入默认运行依赖，避免学习项目启动门槛变高。只有同时使用 Maven `nacos` profile 和 Spring `nacos` profile 时才会启用 Nacos。
 
 本地 Nacos 配置校验：
 

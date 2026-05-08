@@ -1,5 +1,6 @@
 package com.taoking.spring3.catalog.web;
 
+import com.taoking.spring3.catalog.config.CatalogProperties;
 import com.taoking.spring3.catalog.service.CatalogService;
 import com.taoking.spring3.common.dto.ProductResponse;
 import java.util.List;
@@ -16,9 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 class CatalogController {
 
     private final CatalogService catalogService;
+    private final CatalogProperties catalogProperties;
 
-    CatalogController(CatalogService catalogService) {
+    CatalogController(CatalogService catalogService, CatalogProperties catalogProperties) {
         this.catalogService = catalogService;
+        this.catalogProperties = catalogProperties;
     }
 
     @GetMapping("/products")
@@ -40,7 +43,8 @@ class CatalogController {
     Map<String, Object> stats() {
         return Map.of(
                 "service", "catalog-service",
-                "productCount", catalogService.productCount()
+                "productCount", catalogService.productCount(),
+                "slowDelay", catalogProperties.slowDelay().toString()
         );
     }
 }

@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 @FeignClient(
         name = "catalog-service",
-        url = "${demo.clients.catalog.base-url}",
+        url = "${demo.clients.catalog.base-url:}",
         fallbackFactory = CatalogClientFallbackFactory.class
 )
 public interface CatalogClient {

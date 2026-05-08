@@ -142,6 +142,8 @@ class OrderControllerTest {
                 .getForEntity(url("/api/orders/admin/stats"), String.class);
         assertThat(allowed.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(allowed.getBody()).contains("order-service");
+        assertThat(allowed.getBody()).contains("\"currency\":\"CNY\"");
+        assertThat(allowed.getBody()).contains("\"catalogBaseUrlConfigured\":true");
     }
 
     @Test

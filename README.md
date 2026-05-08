@@ -105,7 +105,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080` 和 `host.docker.int
 
 ### 已补充的可选专题
 
-- Nacos 注册中心/配置中心：已补充本地 Docker Compose、版本基线、接入计划和面试重点；默认运行路径不依赖 Nacos。
+- Nacos 注册中心/配置中心：已补充本地 Docker Compose、版本基线、可选 Maven profile、`application-nacos.yml`、服务注册发现、配置中心接入和面试重点；默认运行路径不依赖 Nacos。
 
 ### 后续计划
 
@@ -113,7 +113,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080` 和 `host.docker.int
 
 #### P0：优先补充
 
-- Nacos 实装：增加 `nacos` profile，演示服务注册发现、配置中心、配置刷新；默认 profile 仍不依赖 Nacos。
+- Nacos 深化：已完成 `nacos` profile、服务注册发现、启动期配置中心读取；后续补动态刷新、namespace/group 多环境隔离和 Testcontainers 集成测试。
 - Spring Cloud Gateway：新增 `gateway-service`，演示路由、过滤器、鉴权透传、限流和 fallback。
 - 链路追踪：补充 Micrometer Tracing + OpenTelemetry/Zipkin/Tempo，并在日志中输出 traceId/spanId。
 - RestClient / `@HttpExchange`：补充 Spring 原生 HTTP client 示例，用于和 OpenFeign 做选型对比。

@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: catalog-service
+  cloud:
+    nacos:
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+      discovery:
+        enabled: false
 
 demo:
   catalog:

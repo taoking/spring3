@@ -1,0 +1,27 @@
+spring:
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yml?refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      discovery:
+        enabled: true
+        group: ${NACOS_DISCOVERY_GROUP:DEFAULT_GROUP}
+        namespace: ${NACOS_NAMESPACE:}
+        register-enabled: true
+        metadata:
+          profile: nacos
+      config:
+        enabled: true
+        import-check:
+          enabled: true
+        group: ${NACOS_CONFIG_GROUP:DEFAULT_GROUP}
+        namespace: ${NACOS_NAMESPACE:}
+        file-extension: yml
+        refresh-enabled: true
+
+demo:
+  clients:
+    catalog:
+      base-url: ""

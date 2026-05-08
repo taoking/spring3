@@ -67,7 +67,8 @@ class CatalogControllerTest {
         mockMvc.perform(get("/api/catalog/admin/stats")
                         .with(httpBasic("admin", "admin123")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.productCount").value(3));
+                .andExpect(jsonPath("$.productCount").value(3))
+                .andExpect(jsonPath("$.slowDelay").value("PT2S"));
     }
 
     @Test
