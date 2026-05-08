@@ -109,7 +109,33 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080` 和 `host.docker.int
 
 ### 后续计划
 
-Nacos、Kafka、RabbitMQ、RocketMQ 会作为后续专题补充。Nacos 已先补充本地环境和接入方案；消息队列目前只在文档中保留学习路线，不引入运行依赖。
+当前项目已经覆盖 Spring Boot 3 常用组件。后续面向资深面试准备时，扩展重点放在微服务治理、可观测性、工程化、底层机制和技术取舍，不单纯堆依赖。
+
+#### P0：优先补充
+
+- Nacos 实装：增加 `nacos` profile，演示服务注册发现、配置中心、配置刷新；默认 profile 仍不依赖 Nacos。
+- Spring Cloud Gateway：新增 `gateway-service`，演示路由、过滤器、鉴权透传、限流和 fallback。
+- 链路追踪：补充 Micrometer Tracing + OpenTelemetry/Zipkin/Tempo，并在日志中输出 traceId/spanId。
+- RestClient / `@HttpExchange`：补充 Spring 原生 HTTP client 示例，用于和 OpenFeign 做选型对比。
+- OAuth2 Resource Server / JWT：在 Basic Auth 之外补充 JWT 资源服务器示例，提升 Security 面试覆盖面。
+- 自动配置原理：新增 `demo-spring-boot-starter` 或 `demo-autoconfigure` 模块，演示 starter、条件装配和配置绑定。
+- Resilience4j 深化：补充 Retry、RateLimiter、Bulkhead、TimeLimiter，说明不同治理策略边界。
+- Testcontainers / 集成测试：为 Nacos、Gateway 或外部组件补充可重复集成测试。
+
+#### P1：建议补充
+
+- Docker 镜像与部署：补充 Dockerfile 或 Spring Boot build image、优雅停机、readiness/liveness 探针。
+- Java 21 虚拟线程：增加 `virtual-thread` profile，对比传统线程池和 `@Async`。
+- Sentinel：作为阿里系专题补充，和 Resilience4j 对比限流、熔断、热点参数。
+- 结构化日志：补充 JSON log、MDC、traceId、错误码和请求日志脱敏。
+- API 治理：补充 API versioning、统一错误码、OpenAPI 分组和接口兼容策略。
+- Spring Cloud Contract：补充服务间契约测试，降低 provider/consumer 变更风险。
+
+#### P2：路线保留
+
+- Kafka、RabbitMQ、RocketMQ：先保留学习路线，重点理解投递语义、幂等、重试、顺序消息和死信队列；当前不引入运行依赖。
+- Native Image / AOT：作为 Spring Boot 3 亮点补充文档，暂不作为默认构建链路。
+- Kubernetes：先补部署和探针说明，不急于维护完整 K8s YAML。
 
 详见：
 
@@ -117,4 +143,5 @@ Nacos、Kafka、RabbitMQ、RocketMQ 会作为后续专题补充。Nacos 已先�
 - [实施文档](docs/IMPLEMENTATION.md)
 - [Nacos 补充专题](docs/nacos-playbook.md)
 - [Spring Boot 3 面试补充路线](docs/interview-roadmap.md)
+- [后续任务计划 Prompt 索引](docs/task-plans/README.md)
 - [消息队列后续计划](docs/messaging-roadmap.md)
