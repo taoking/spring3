@@ -1,0 +1,84 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: order-service
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=100,expireAfterWrite=5m,recordStats
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+      client:
+        config:
+          catalog-service:
+            connect-timeout: 500
+            read-timeout: 800
+            logger-level: basic
+
+demo:
+  order:
+    currency: CNY
+    notification-delay: PT0.1S
+    heartbeat-delay: PT60S
+  clients:
+    catalog:
+      base-url: http://localhost:8081
+      username: user
+      password: user123
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      catalog-service:
+        sliding-window-size: 5
+        minimum-number-of-calls: 2
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5s
+  timelimiter:
+    instances:
+      catalog-service:
+        timeout-duration: 1s
+
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,caches
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  info:
+    env:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+info:
+  app:
+    name: order-service
+    description: Order consumer for the Spring Boot 3 learning lab
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${APP_ENV:local}
+  release: spring3-learning@0.0.1-SNAPSHOT
+  traces-sample-rate: 1.0
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.taoking.spring3.order.client: DEBUG

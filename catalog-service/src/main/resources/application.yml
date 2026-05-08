@@ -1,0 +1,62 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: catalog-service
+
+demo:
+  catalog:
+    slow-delay: 2s
+    products:
+      - id: 1
+        sku: SKU-1001
+        name: Spring Boot 3 Guide
+        price: 99.00
+        active: true
+      - id: 2
+        sku: SKU-1002
+        name: Observability Workbook
+        price: 129.00
+        active: true
+      - id: 3
+        sku: SKU-1003
+        name: Feign Practice Kit
+        price: 79.00
+        active: true
+
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  info:
+    env:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+info:
+  app:
+    name: catalog-service
+    description: Product provider for the Spring Boot 3 learning lab
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${APP_ENV:local}
+  release: spring3-learning@0.0.1-SNAPSHOT
+  traces-sample-rate: 1.0
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Spring3 Learning
+    orgId: 1
+    folder: Spring3
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
