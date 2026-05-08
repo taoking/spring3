@@ -40,19 +40,21 @@ docker logs -f spring3-nacos
 当前已实现：
 
 1. 父 POM 引入 `spring-cloud-alibaba-dependencies:2025.0.0.0`。
-2. `catalog-service`、`order-service` 中通过 `nacos` Maven profile 引入：
+2. `catalog-service`、`order-service`、`gateway-service` 中通过 `nacos` Maven profile 引入：
    - `spring-cloud-starter-alibaba-nacos-discovery`
    - `spring-cloud-starter-alibaba-nacos-config`
-   - `spring-cloud-starter-loadbalancer`，仅 `order-service` 需要
+   - `spring-cloud-starter-loadbalancer`，`order-service` 和 `gateway-service` 使用服务名调用时需要
 3. 新增 `application-nacos.yml`，只在 `SPRING_PROFILES_ACTIVE=nacos` 时启用：
    - `spring.cloud.nacos.server-addr`
    - `spring.config.import=optional:nacos:order-service.yml?refreshEnabled=true`
    - `spring.config.import=optional:nacos:catalog-service.yml?refreshEnabled=true`
+   - `spring.config.import=optional:nacos:gateway-service.yml?refreshEnabled=true`
 4. 默认 `application.yml` 显式关闭 Nacos config/discovery，避免只启用 Maven profile 时影响默认测试。
 5. `catalog-service` 注册到 Nacos，验证服务列表里出现 `catalog-service`。
 6. `order-service` 把 Feign 调用从固定 URL 扩展为发现优先：
    - 默认 profile 继续使用 `demo.clients.catalog.base-url=http://localhost:8081`。
    - `nacos` profile 使用服务名 `catalog-service` + Spring Cloud LoadBalancer。
+7. `gateway-service` 默认使用 localhost 静态路由，`nacos` profile 下使用 `lb://catalog-service` 和 `lb://order-service`。
 
 ## 启动与验证
 
@@ -78,6 +80,14 @@ curl -fsS -X POST 'http://127.0.0.1:8848/nacos/v1/cs/configs' \
   --data-urlencode 'content=demo:
   catalog:
     slow-delay: 1s'
+
+curl -fsS -X POST 'http://127.0.0.1:8848/nacos/v1/cs/configs' \
+  --data-urlencode 'dataId=gateway-service.yml' \
+  --data-urlencode 'group=DEFAULT_GROUP' \
+  --data-urlencode 'content=demo:
+  gateway:
+    rate-limit:
+      requests-per-window: 120'
 ```
 
 打包并启动服务：
@@ -87,6 +97,7 @@ curl -fsS -X POST 'http://127.0.0.1:8848/nacos/v1/cs/configs' \
 
 SPRING_PROFILES_ACTIVE=nacos java -jar catalog-service/target/catalog-service-0.0.1-SNAPSHOT.jar
 SPRING_PROFILES_ACTIVE=nacos java -jar order-service/target/order-service-0.0.1-SNAPSHOT.jar
+SPRING_PROFILES_ACTIVE=nacos java -jar gateway-service/target/gateway-service-0.0.1-SNAPSHOT.jar
 ```
 
 验证注册发现：
@@ -94,6 +105,7 @@ SPRING_PROFILES_ACTIVE=nacos java -jar order-service/target/order-service-0.0.1-
 ```bash
 curl -fsS 'http://127.0.0.1:8848/nacos/v1/ns/instance/list?serviceName=catalog-service'
 curl -fsS 'http://127.0.0.1:8848/nacos/v1/ns/instance/list?serviceName=order-service'
+curl -fsS 'http://127.0.0.1:8848/nacos/v1/ns/instance/list?serviceName=gateway-service'
 ```
 
 验证配置读取和 Feign 服务名调用：
@@ -106,6 +118,11 @@ curl -u user:user123 \
   -H 'Content-Type: application/json' \
   -d '{"sku":"SKU-1001","quantity":2}' \
   http://localhost:8080/api/orders/preview
+
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8088/orders/api/orders/preview
 ```
 
 ## 验收标准
@@ -114,8 +131,9 @@ curl -u user:user123 \
 - `./mvnw -Pnacos test` 通过，证明可选 Nacos 依赖不会破坏默认 Spring profile。
 - `docker compose -f platform/nacos/docker-compose.yml config` 通过。
 - Nacos 启动后，控制台可以访问，客户端 API 端口可连通。
-- `nacos` profile 下两个服务能注册到 Nacos。
+- `nacos` profile 下三个服务能注册到 Nacos。
 - `order-service` 在不配置固定 URL 时能通过 Nacos 发现并调用 `catalog-service`。
+- `gateway-service` 在 `nacos` profile 下能通过 `lb://` 服务名路由到 order/catalog。
 - 应用启动时可通过 `spring.config.import` 拉取 Nacos 配置。当前只验收启动期读取；动态刷新作为后续扩展单独验证。
 
 ## 面试重点

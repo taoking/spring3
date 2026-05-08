@@ -1,0 +1,23 @@
+spring:
+  config:
+    import: optional:nacos:${spring.application.name}.yml?refreshEnabled=true
+  cloud:
+    nacos:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      config:
+        enabled: true
+        group: ${NACOS_CONFIG_GROUP:DEFAULT_GROUP}
+        namespace: ${NACOS_NAMESPACE:}
+        file-extension: yml
+      discovery:
+        enabled: true
+        group: ${NACOS_DISCOVERY_GROUP:DEFAULT_GROUP}
+        namespace: ${NACOS_NAMESPACE:}
+        metadata:
+          profile: nacos
+
+demo:
+  gateway:
+    routes:
+      catalog-uri: lb://catalog-service
+      order-uri: lb://order-service

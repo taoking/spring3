@@ -9,6 +9,7 @@
 - `common`：共享 DTO、AOP 注解等公共类型。
 - `catalog-service`：商品服务 provider，默认端口 `8081`。
 - `order-service`：订单服务 consumer，默认端口 `8080`，通过 OpenFeign 调用 `catalog-service`。
+- `gateway-service`：Spring Cloud Gateway 统一入口，默认端口 `8088`。
 
 ## 技术栈
 
@@ -16,7 +17,7 @@
 - Spring Boot 3.5.14
 - Spring Cloud 2025.0.2
 - Maven 多模块 + Maven Wrapper
-- Spring Web MVC、Validation、Security、OpenFeign、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Sentry、SpringDoc OpenAPI
+- Spring Web MVC、WebFlux Gateway、Validation、Security、OpenFeign、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Sentry、SpringDoc OpenAPI
 
 ## 快速启动
 
@@ -24,6 +25,7 @@
 ./mvnw test
 ./mvnw -pl catalog-service spring-boot:run
 ./mvnw -pl order-service spring-boot:run
+./mvnw -pl gateway-service spring-boot:run
 ```
 
 默认账号：
@@ -35,6 +37,8 @@
 
 - Order Swagger UI: `http://localhost:8080/swagger-ui.html`
 - Catalog Swagger UI: `http://localhost:8081/swagger-ui.html`
+- Gateway health: `http://localhost:8088/actuator/health`
+- Gateway Prometheus metrics: `http://localhost:8088/actuator/prometheus`
 - Order health: `http://localhost:8080/actuator/health`
 - Catalog health: `http://localhost:8081/actuator/health`
 - Order Prometheus metrics: `http://localhost:8080/actuator/prometheus`
@@ -47,6 +51,15 @@ curl -u user:user123 \
   -H 'Content-Type: application/json' \
   -d '{"sku":"SKU-1001","quantity":2}' \
   http://localhost:8080/api/orders/preview
+```
+
+通过网关调用：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8088/orders/api/orders/preview
 ```
 
 触发 Feign 降级：
@@ -94,6 +107,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080` 和 `host.docker.int
 - Spring Security Basic 与 `@PreAuthorize`
 - OpenFeign 服务间调用
 - Resilience4j 熔断降级
+- Spring Cloud Gateway 路由、过滤器、认证透传、限流、fallback
 - Caffeine 本地缓存
 - AOP 自定义注解切面
 - `@Async` 异步任务
@@ -106,6 +120,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080` 和 `host.docker.int
 ### 已补充的可选专题
 
 - Nacos 注册中心/配置中心：已补充本地 Docker Compose、版本基线、可选 Maven profile、`application-nacos.yml`、服务注册发现、配置中心接入和面试重点；默认运行路径不依赖 Nacos。
+- Gateway 服务发现路由：`gateway-service` 默认使用 localhost 静态路由，`nacos` profile 下切换为 `lb://catalog-service` 和 `lb://order-service`。
 
 ### 后续计划
 
@@ -114,7 +129,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080` 和 `host.docker.int
 #### P0：优先补充
 
 - Nacos 深化：已完成 `nacos` profile、服务注册发现、启动期配置中心读取；后续补动态刷新、namespace/group 多环境隔离和 Testcontainers 集成测试。
-- Spring Cloud Gateway：新增 `gateway-service`，演示路由、过滤器、鉴权透传、限流和 fallback。
+- Spring Cloud Gateway 深化：已完成 `gateway-service`、静态/Nacos 路由、过滤器、鉴权透传、限流和 fallback；后续可补灰度路由、跨域和更贴近生产的分布式限流。
 - 链路追踪：补充 Micrometer Tracing + OpenTelemetry/Zipkin/Tempo，并在日志中输出 traceId/spanId。
 - RestClient / `@HttpExchange`：补充 Spring 原生 HTTP client 示例，用于和 OpenFeign 做选型对比。
 - OAuth2 Resource Server / JWT：在 Basic Auth 之外补充 JWT 资源服务器示例，提升 Security 面试覆盖面。

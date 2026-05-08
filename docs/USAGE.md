@@ -16,6 +16,7 @@
 | Spring Cloud | `2025.0.2` |
 | Order Service | `localhost:8080` |
 | Catalog Service | `localhost:8081` |
+| Gateway Service | `localhost:8088` |
 | Prometheus | `localhost:9090` |
 | Grafana | `localhost:3000` |
 | Nacos 控制台 | `localhost:8847` |
@@ -36,6 +37,8 @@
 | `pom.xml` | 父工程、版本、依赖管理 |
 | `catalog-service/src/main/resources/application.yml` | 商品服务端口、商品样例、Actuator、Sentry |
 | `order-service/src/main/resources/application.yml` | 订单服务端口、Feign、缓存、Resilience4j、Actuator、Sentry |
+| `gateway-service/src/main/resources/application.yml` | 网关端口、静态路由、本地限流、fallback、Actuator |
+| `gateway-service/src/main/resources/application-nacos.yml` | 网关 Nacos 服务发现路由 |
 | `observability/docker-compose.yml` | Prometheus + Grafana |
 | `observability/prometheus/prometheus.yml` | Prometheus 抓取目标 |
 | `platform/nacos/docker-compose.yml` | 本地 Nacos 3.0.3 |
@@ -60,6 +63,7 @@
 ```bash
 ./mvnw -pl catalog-service test
 ./mvnw -pl order-service test
+./mvnw -pl gateway-service test
 ```
 
 清理构建产物：
@@ -80,6 +84,10 @@
 ./mvnw -pl order-service spring-boot:run
 ```
 
+```bash
+./mvnw -pl gateway-service spring-boot:run
+```
+
 ## 后台启动服务
 
 先打包：
@@ -93,6 +101,7 @@
 ```bash
 screen -dmS spring3-catalog zsh -lc 'java -jar catalog-service/target/catalog-service-0.0.1-SNAPSHOT.jar > catalog-service/target/run.log 2>&1'
 screen -dmS spring3-order zsh -lc 'java -jar order-service/target/order-service-0.0.1-SNAPSHOT.jar > order-service/target/run.log 2>&1'
+screen -dmS spring3-gateway zsh -lc 'java -jar gateway-service/target/gateway-service-0.0.1-SNAPSHOT.jar > gateway-service/target/run.log 2>&1'
 ```
 
 查看后台会话：
@@ -106,6 +115,7 @@ screen -ls
 ```bash
 tail -f catalog-service/target/run.log
 tail -f order-service/target/run.log
+tail -f gateway-service/target/run.log
 ```
 
 停止后台服务：
@@ -113,6 +123,7 @@ tail -f order-service/target/run.log
 ```bash
 screen -S spring3-catalog -X quit
 screen -S spring3-order -X quit
+screen -S spring3-gateway -X quit
 ```
 
 ## 健康检查
@@ -120,6 +131,7 @@ screen -S spring3-order -X quit
 ```bash
 curl -fsS http://localhost:8081/actuator/health
 curl -fsS http://localhost:8080/actuator/health
+curl -fsS http://localhost:8088/actuator/health
 ```
 
 Swagger：
@@ -159,8 +171,86 @@ curl -u user:user123 \
 触发管理员权限校验：
 
 ```bash
-curl -u user:user123 http://localhost:8080/api/orders/admin/ping
-curl -u admin:admin123 http://localhost:8080/api/orders/admin/ping
+curl -u user:user123 http://localhost:8080/api/orders/admin/stats
+curl -u admin:admin123 http://localhost:8080/api/orders/admin/stats
+```
+
+## Spring Cloud Gateway
+
+`gateway-service` 是统一入口，默认端口 `8088`。默认 profile 使用静态路由：
+
+| 网关路径 | 下游 |
+| --- | --- |
+| `/catalog/**` | `http://localhost:8081/**` |
+| `/orders/**` | `http://localhost:8080/**` |
+
+网关不承载业务鉴权逻辑，默认透传 `Authorization` header；服务侧仍负责 Basic Auth 和 `@PreAuthorize`。网关会补充：
+
+- `X-Request-Id`：请求链路标识，同时写入响应头和下游请求头。
+- `X-Gateway-Auth-Type`：识别 `Basic`、`Bearer` 或其他认证头，便于后续扩展 JWT。
+- `X-RateLimit-Limit`、`X-RateLimit-Remaining`：本地学习版限流响应头。
+
+启动顺序：
+
+```bash
+./mvnw -pl catalog-service spring-boot:run
+./mvnw -pl order-service spring-boot:run
+./mvnw -pl gateway-service spring-boot:run
+```
+
+验证 catalog 路由：
+
+```bash
+curl -u user:user123 \
+  -H 'X-Request-Id: demo-gateway-catalog-1' \
+  http://localhost:8088/catalog/api/catalog/products/SKU-1001
+```
+
+验证 order 路由：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -H 'X-Request-Id: demo-gateway-order-1' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8088/orders/api/orders/preview
+```
+
+验证未认证请求：
+
+```bash
+curl -i http://localhost:8088/catalog/api/catalog/products/SKU-1001
+```
+
+预期由下游服务返回 `401`。如果下游未启动，网关会返回 fallback `503`。
+
+验证 fallback：
+
+```bash
+screen -S spring3-order -X quit
+
+curl -i -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8088/orders/api/orders/preview
+```
+
+验证网关 Actuator：
+
+```bash
+curl -fsS http://localhost:8088/actuator/health
+curl -fsS http://localhost:8088/actuator/prometheus | grep jvm
+```
+
+限流配置位于 `gateway-service/src/main/resources/application.yml`：
+
+```yaml
+demo:
+  gateway:
+    rate-limit:
+      enabled: true
+      requests-per-window: 60
+      window: 1m
 ```
 
 ## Prometheus + Grafana
@@ -256,6 +346,14 @@ curl -fsS -X POST 'http://127.0.0.1:8848/nacos/v1/cs/configs' \
   --data-urlencode 'content=demo:
   catalog:
     slow-delay: 1s'
+
+curl -fsS -X POST 'http://127.0.0.1:8848/nacos/v1/cs/configs' \
+  --data-urlencode 'dataId=gateway-service.yml' \
+  --data-urlencode 'group=DEFAULT_GROUP' \
+  --data-urlencode 'content=demo:
+  gateway:
+    rate-limit:
+      requests-per-window: 120'
 ```
 
 打包：
@@ -274,11 +372,16 @@ SPRING_PROFILES_ACTIVE=nacos java -jar catalog-service/target/catalog-service-0.
 SPRING_PROFILES_ACTIVE=nacos java -jar order-service/target/order-service-0.0.1-SNAPSHOT.jar
 ```
 
+```bash
+SPRING_PROFILES_ACTIVE=nacos java -jar gateway-service/target/gateway-service-0.0.1-SNAPSHOT.jar
+```
+
 后台启动：
 
 ```bash
 screen -dmS spring3-nacos-catalog zsh -lc 'SPRING_PROFILES_ACTIVE=nacos java -jar catalog-service/target/catalog-service-0.0.1-SNAPSHOT.jar > catalog-service/target/nacos-run.log 2>&1'
 screen -dmS spring3-nacos-order zsh -lc 'SPRING_PROFILES_ACTIVE=nacos java -jar order-service/target/order-service-0.0.1-SNAPSHOT.jar > order-service/target/nacos-run.log 2>&1'
+screen -dmS spring3-nacos-gateway zsh -lc 'SPRING_PROFILES_ACTIVE=nacos java -jar gateway-service/target/gateway-service-0.0.1-SNAPSHOT.jar > gateway-service/target/nacos-run.log 2>&1'
 ```
 
 查看状态和日志：
@@ -288,6 +391,7 @@ docker compose -f platform/nacos/docker-compose.yml ps
 docker logs -f spring3-nacos
 tail -f catalog-service/target/nacos-run.log
 tail -f order-service/target/nacos-run.log
+tail -f gateway-service/target/nacos-run.log
 ```
 
 验证注册发现：
@@ -295,6 +399,7 @@ tail -f order-service/target/nacos-run.log
 ```bash
 curl -fsS 'http://127.0.0.1:8848/nacos/v1/ns/instance/list?serviceName=catalog-service'
 curl -fsS 'http://127.0.0.1:8848/nacos/v1/ns/instance/list?serviceName=order-service'
+curl -fsS 'http://127.0.0.1:8848/nacos/v1/ns/instance/list?serviceName=gateway-service'
 ```
 
 验证配置读取和服务名调用：
@@ -307,6 +412,11 @@ curl -u user:user123 \
   -H 'Content-Type: application/json' \
   -d '{"sku":"SKU-1001","quantity":2}' \
   http://localhost:8080/api/orders/preview
+
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8088/orders/api/orders/preview
 ```
 
 停止：
@@ -314,6 +424,7 @@ curl -u user:user123 \
 ```bash
 screen -S spring3-nacos-catalog -X quit
 screen -S spring3-nacos-order -X quit
+screen -S spring3-nacos-gateway -X quit
 docker compose -f platform/nacos/docker-compose.yml down
 ```
 
@@ -345,6 +456,7 @@ curl -u admin:admin123 -X POST http://localhost:8080/api/orders/admin/sentry-err
 ```bash
 lsof -nP -iTCP:8080 -sTCP:LISTEN
 lsof -nP -iTCP:8081 -sTCP:LISTEN
+lsof -nP -iTCP:8088 -sTCP:LISTEN
 lsof -nP -iTCP:9090 -sTCP:LISTEN
 lsof -nP -iTCP:3000 -sTCP:LISTEN
 lsof -nP -iTCP:8848 -sTCP:LISTEN
@@ -357,6 +469,7 @@ lsof -nP -iTCP:8848 -sTCP:LISTEN
 ```bash
 screen -S spring3-catalog -X quit
 screen -S spring3-order -X quit
+screen -S spring3-gateway -X quit
 ```
 
 停止 Docker 服务：

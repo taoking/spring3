@@ -4,6 +4,23 @@
 
 新增 `gateway-service`，把系统入口从直接访问服务升级为网关统一入口，演示路由、过滤器、认证透传、限流和 fallback。
 
+## 当前状态
+
+已实现。后续如果继续扩展，可以补充跨域、灰度路由、JWT Resource Server、分布式限流和更完整的网关指标看板。
+
+## 验证记录
+
+- `./mvnw -pl gateway-service test` 通过。
+- `./mvnw test` 通过，全量模块没有回归。
+- `./mvnw -Pnacos test` 通过，Nacos 可选依赖不会破坏默认 Spring profile。
+- `./mvnw package -DskipTests` 通过，`gateway-service` 可构建可执行 jar。
+- 已验证 `./mvnw -pl gateway-service spring-boot:run` 可启动，`/actuator/health` 返回 `UP`。
+- 已启动 `catalog-service`、`order-service`、`gateway-service`，通过 `http://localhost:8088/catalog/**` 和 `http://localhost:8088/orders/**` 成功访问下游业务接口。
+- 已验证未携带认证信息访问受保护业务路由时返回 `401`。
+- 已停止 `order-service` 并验证网关对 `/orders/**` 返回明确 fallback：`503` + `{"title":"Gateway fallback"}`。
+- 已验证 `/actuator/prometheus` 可访问，并包含 `application="gateway-service"` 指标标签。
+- 已验证网关日志输出 `requestId`、`routeId`、`status`、`elapsedMs`。
+
 ## 任务 Prompt
 
 ```text
