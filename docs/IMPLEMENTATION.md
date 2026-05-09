@@ -30,6 +30,7 @@
 - `catalog-service` 可以通过 Spring Cloud Contract 生成 provider 验证测试和本地 `stubs` jar，`order-service` 可以使用 Stub Runner 消费 stubs 验证服务间契约。
 - `order-service` 可以通过 `-Prabbitmq` + `rabbitmq` profile 启用 RabbitMQ 订单预览事件示例，覆盖生产、消费、eventId 幂等、重试和死信队列。
 - `catalog-service` 可以完成 Spring AOT 处理，Native Image / AOT 构建命令、兼容注意事项和失败排查已文档化；native binary 编译不进入默认 CI。
+- `catalog-service` 和 `order-service` 有 Kubernetes 最小部署 YAML，覆盖 Deployment、Service、ConfigMap、Secret 示例、Actuator readiness/liveness、资源 requests/limits、滚动发布和优雅停机。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 默认 profile 没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖；RabbitMQ 仅作为隔离的可选 profile。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
@@ -69,6 +70,7 @@
 - CI：GitHub Actions 使用 JDK 21 和 Maven cache，默认 job 运行 `./mvnw -B test`，Docker job 运行 `./mvnw -B -Pintegration-test verify` 和 RabbitMQ IT 命令。
 - 容器化：`catalog-service/Dockerfile` 和 `order-service/Dockerfile` 使用 JDK 21 JRE Alpine 镜像、非 root 用户和 `JAVA_OPTS`；`deployment/docker-compose.yml` 启动两个业务服务、Prometheus、Grafana、Zipkin。
 - 容器网络：`order-service` 在 Compose 中通过 `DEMO_CLIENTS_CATALOG_BASE_URL=http://catalog-service:8081` 调用 `catalog-service`，Prometheus 通过 `catalog-service:8081` 和 `order-service:8080` 抓取指标。
+- Kubernetes：`deployment/k8s` 提供最小 YAML，包含 `spring3` namespace、业务 ConfigMap、空 Sentry Secret 示例、两个业务 Deployment/Service、Actuator 探针、滚动发布策略、资源配额和 Prometheus 抓取注解。
 - 虚拟线程：`order-service` 的 `virtual-thread` profile 设置 `spring.threads.virtual.enabled=true`，并把 `demoTaskExecutor` 从默认 `ThreadPoolTaskExecutor` 切换为虚拟线程 `SimpleAsyncTaskExecutor`。
 - 线程观察：`/api/orders/thread-probe` 支持请求线程和 `@Async` 线程两种模式，响应返回线程名、是否虚拟线程和模拟 I/O 等待时长。
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
@@ -230,6 +232,33 @@ Native Image / AOT 不新增业务依赖，也不改变默认构建链路。Spri
 - 不直接对聚合依赖模块执行 `spring-boot:process-aot`，因为 `common` 和 starter 模块没有 main class。
 - SpringDoc、Sentry、OpenFeign、Gateway、Resilience4j、AOP 和 Jackson 的 native 兼容性需要在后续扩展时逐项验证。
 
+### Kubernetes 部署示例
+
+Kubernetes 示例位于 `deployment/k8s`，用于学习部署对象和面试复盘，不要求真实集群。
+
+当前对象：
+
+- `Namespace`：固定为 `spring3`。
+- `ConfigMap`：管理非敏感配置，例如 `APP_ENV`、`JAVA_OPTS`、`DEMO_CLIENTS_CATALOG_BASE_URL`。
+- `Secret`：只提供空 `SENTRY_DSN` 示例，不提交真实密钥。
+- `Service`：为 `catalog-service` 和 `order-service` 提供 ClusterIP 稳定访问入口。
+- `Deployment`：为两个业务服务配置 2 副本、滚动发布、资源 requests/limits、Actuator 探针和 graceful shutdown。
+
+探针策略：
+
+- `startupProbe` 给 JVM 和 Spring 容器启动时间，避免 liveness 过早重启。
+- `readinessProbe` 使用 `/actuator/health/readiness`，决定 Pod 是否进入 Service endpoints。
+- `livenessProbe` 使用 `/actuator/health/liveness`，只判断进程是否需要重启。
+
+滚动发布与停机配套：
+
+- `maxUnavailable=0` 保持发布过程中旧 Pod 不被过早下线。
+- `maxSurge=1` 允许先拉起一个新 Pod。
+- `terminationGracePeriodSeconds=35` 大于 Spring `20s` graceful shutdown。
+- `preStop sleep 10` 给 endpoints 摘除和连接排空留时间。
+
+Prometheus 当前通过 Service/Pod 注解抓取 `/actuator/prometheus`。如果集群使用 Prometheus Operator，可在真实环境中补 ServiceMonitor CRD，本仓库不直接提交该 CRD 对象，避免 dry-run 依赖集群扩展。
+
 ## 运行方式
 
 ```bash
@@ -239,6 +268,7 @@ Native Image / AOT 不新增业务依赖，也不改变默认构建链路。Spri
 ./mvnw -Pcontract-test -pl catalog-service -am install
 ./mvnw -Pcontract-test -pl order-service -am -Dtest=OrderCatalogContractStubTest -Dsurefire.failIfNoSpecifiedTests=false test
 ./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests
+kubeconform -strict -summary deployment/k8s/*.yaml
 ./mvnw package -DskipTests
 docker compose -f deployment/docker-compose.yml up -d
 ./mvnw -pl catalog-service spring-boot:run
@@ -341,6 +371,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `order-service` 增加 `OrderRabbitMqProfileIT`，在 `rabbitmq` + `integration-test` profile 下用 Testcontainers 启动 `rabbitmq:3.13-management`，验证订单预览事件生产/消费、重复 eventId 幂等跳过和异常 SKU 重试后进入 DLQ。
 - `catalog-service` 增加 Spring Cloud Contract provider 测试，覆盖商品查询成功、`404 ProblemDetail` 和 `500 ProblemDetail` 的响应结构。
 - `catalog-service` 已执行 Spring AOT 处理验证；native binary 编译已记录本机缺少 GraalVM `native-image` 的失败原因和后续处理建议。
+- `deployment/k8s` 已通过 `kubeconform -strict -summary deployment/k8s/*.yaml` 校验，8 个资源全部有效；当前本机无 Kubernetes API server，`kubectl apply --dry-run=client` 会失败在 API discovery。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - `gateway-service` 增加 Testcontainers 集成测试，使用 `nginx:1.27.3-alpine` 作为容器化下游，覆盖真实 Gateway 路由到外部依赖的路径。
 - `.github/workflows/ci.yml` 包含 `unit-tests` 和 `integration-tests` 两个 job，分别覆盖默认测试和 Docker 集成测试。
@@ -357,6 +388,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - 不把 RabbitMQ 作为默认 profile 或核心业务路径的必需依赖。
 - 不实现数据库事务消息、outbox、分布式事务消息。
 - 不把 native binary 构建加入默认 CI 或默认发布路径。
+- 不维护生产级 Kubernetes 集群、Ingress、HPA、ServiceMonitor CRD 或 Helm chart。
 - 不把 Nacos 作为默认 profile 的必需依赖。
 - 不把 Sentinel 作为默认 profile 的必需依赖。
 - 不把 Zipkin 作为业务服务启动的硬依赖。

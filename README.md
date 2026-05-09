@@ -152,6 +152,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Spring Cloud Contract：已补充 `catalog-service` provider 契约、生成 stubs jar、`order-service` consumer Stub Runner 测试，覆盖成功、商品不存在和模拟失败三类下游响应。
 - RabbitMQ 消息队列：已新增可选 `rabbitmq` Maven/Spring profile、本地 Compose、订单预览事件发布/消费、eventId 幂等、消费重试和 DLQ，以及 Testcontainers 集成测试；默认运行路径不引入 MQ。
 - Native Image / AOT：已补充 `catalog-service` 最小 AOT 验证、native binary / buildpacks 构建命令、第三方库兼容注意事项和排障说明；当前本机 native 编译阻塞于未安装 GraalVM `native-image`。
+- Kubernetes：已新增 `deployment/k8s` 最小部署示例，覆盖 Namespace、ConfigMap、Secret 示例、Deployment、Service、Actuator readiness/liveness、资源 requests/limits、滚动发布、优雅停机和 Prometheus 抓取注解。
 
 ### 后续计划
 
@@ -181,7 +182,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 
 - Kafka、RabbitMQ、RocketMQ：RabbitMQ 基线已完成；后续继续补 Kafka partition/offset/consumer group、RocketMQ tag/顺序/事务消息，并围绕投递语义、幂等、重试、顺序消息和死信队列做对比。
 - Native Image / AOT：已补充专题文档和 `catalog-service` AOT 基线；后续可在安装 GraalVM 后继续验证 native binary，并逐步扩展到 `order-service`。
-- Kubernetes：先补部署和探针说明，不急于维护完整 K8s YAML。
+- Kubernetes：已补最小 YAML 和使用说明；后续可按真实集群补 Ingress、HPA、ServiceMonitor CRD、镜像 registry 发布和 GitOps 流程。
 
 详见：
 
@@ -189,6 +190,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - [实施文档](docs/IMPLEMENTATION.md)
 - [Nacos 补充专题](docs/nacos-playbook.md)
 - [Native Image / AOT 专题](docs/native-aot.md)
+- [Kubernetes 部署示例](docs/kubernetes.md)
 - [Spring Boot 3 面试补充路线](docs/interview-roadmap.md)
 - [后续任务计划 Prompt 索引](docs/task-plans/README.md)
 - [消息队列后续计划](docs/messaging-roadmap.md)

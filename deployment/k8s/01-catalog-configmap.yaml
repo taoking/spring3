@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: catalog-service-config
+  namespace: spring3
+  labels:
+    app.kubernetes.io/name: catalog-service
+    app.kubernetes.io/part-of: spring3-learning
+data:
+  APP_ENV: k8s
+  SERVER_SHUTDOWN: graceful
+  SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 20s
+  TRACING_SAMPLING_PROBABILITY: "1.0"
+  ZIPKIN_TRACING_ENABLED: "false"
+  ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+  JAVA_OPTS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+

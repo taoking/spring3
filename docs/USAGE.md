@@ -50,6 +50,8 @@
 | `observability/prometheus/prometheus.yml` | Prometheus 抓取目标 |
 | `deployment/docker-compose.yml` | 应用容器 + Prometheus + Grafana + Zipkin 一体化本地部署 |
 | `deployment/prometheus/prometheus.yml` | 容器网络内按服务名抓取业务服务指标 |
+| `deployment/k8s/*.yaml` | Kubernetes 最小部署示例 |
+| `docs/kubernetes.md` | Kubernetes 部署、探针、滚动发布和排障说明 |
 | `platform/nacos/docker-compose.yml` | 本地 Nacos 3.0.3 |
 | `platform/rabbitmq/docker-compose.yml` | 本地 RabbitMQ + Management UI |
 | `docs/native-aot.md` | Spring AOT / Native Image 构建、验证和排障说明 |
@@ -218,6 +220,80 @@ docker compose -f deployment/docker-compose.yml ps
 docker inspect spring3-app-order --format '{{json .State.Health}}'
 docker compose -f deployment/docker-compose.yml logs --tail=200 order-service
 ```
+
+## Kubernetes 部署示例
+
+当前 Kubernetes 示例不要求真实集群，重点是学习 Deployment、Service、ConfigMap、Secret、readiness/liveness、资源限制、滚动发布和优雅停机。完整说明见 [Kubernetes 部署示例](kubernetes.md)。
+
+先构建镜像：
+
+```bash
+./mvnw package -DskipTests
+docker build -t spring3/catalog-service:local ./catalog-service
+docker build -t spring3/order-service:local ./order-service
+```
+
+无真实集群时做离线 schema 校验：
+
+```bash
+brew install kubeconform
+kubeconform -strict -summary deployment/k8s/*.yaml
+```
+
+有真实集群时做 dry-run：
+
+```bash
+kubectl apply --dry-run=client -f deployment/k8s
+kubectl apply --dry-run=server -f deployment/k8s
+```
+
+较新的 `kubectl` 在 `--dry-run=client` 下仍可能连接 API server 做资源 discovery；没有集群时可用 kubeconform 先做离线校验。
+
+应用和查看：
+
+```bash
+kubectl apply -f deployment/k8s
+kubectl -n spring3 get deploy,svc,pod
+kubectl -n spring3 rollout status deploy/catalog-service
+kubectl -n spring3 rollout status deploy/order-service
+```
+
+端口转发验证：
+
+```bash
+kubectl -n spring3 port-forward svc/catalog-service 8081:8081
+curl -fsS http://localhost:8081/actuator/health
+```
+
+```bash
+kubectl -n spring3 port-forward svc/order-service 8080:8080
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8080/api/orders/preview
+```
+
+清理：
+
+```bash
+kubectl delete -f deployment/k8s
+```
+
+Manifest 覆盖内容：
+
+| 对象 | 说明 |
+| --- | --- |
+| `Namespace` | 固定使用 `spring3` |
+| `ConfigMap` | 非敏感环境变量、服务间调用地址、JVM 参数 |
+| `Secret` | 空 `SENTRY_DSN` 示例，不提交真实 DSN |
+| `Deployment` | 2 副本、滚动发布、资源 requests/limits、`preStop`、graceful shutdown |
+| `Service` | ClusterIP，`order-service` 通过 `http://catalog-service:8081` 调用 provider |
+
+探针使用 Actuator：
+
+- readiness：`/actuator/health/readiness`
+- liveness：`/actuator/health/liveness`
+- startup：`/actuator/health/liveness`
 
 ## 自定义 Starter / Autoconfigure
 

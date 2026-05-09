@@ -25,6 +25,57 @@
 - `kubectl apply --dry-run=client -f deployment/k8s`
 - ConfigMap 注入 `demo.clients.catalog.base-url`。
 
+## 当前实施结果
+
+- 已新增专题文档：[Kubernetes 部署示例](../kubernetes.md)。
+- 已新增 `deployment/k8s/00-namespace.yaml`。
+- 已新增 `deployment/k8s/01-catalog-configmap.yaml` 和 `deployment/k8s/02-order-configmap.yaml`。
+- 已新增 `deployment/k8s/03-runtime-secret.yaml`，只包含空 `SENTRY_DSN` 示例，不包含真实密钥。
+- 已新增 `deployment/k8s/10-catalog-service.yaml`，包含 `catalog-service` Service + Deployment。
+- 已新增 `deployment/k8s/20-order-service.yaml`，包含 `order-service` Service + Deployment。
+- `order-service` 通过 `DEMO_CLIENTS_CATALOG_BASE_URL=http://catalog-service:8081` 调用 Kubernetes Service。
+- Deployment 已配置 Actuator readiness/liveness/startup probes、resources requests/limits、RollingUpdate、`preStop` 和 `terminationGracePeriodSeconds`。
+- Prometheus 抓取以 Service/Pod annotations 方式演示；ServiceMonitor 仅写入文档示例，不提交 CRD 对象。
+
+## 验证命令
+
+无真实集群时：
+
+```bash
+kubeconform -strict -summary deployment/k8s/*.yaml
+```
+
+当前本地结果：
+
+```text
+Summary: 8 resources found in 6 files - Valid: 8, Invalid: 0, Errors: 0, Skipped: 0
+```
+
+有可连接集群时：
+
+```bash
+kubectl apply --dry-run=client -f deployment/k8s
+kubectl apply --dry-run=server -f deployment/k8s
+```
+
+当前本机没有 Kubernetes API server，`kubectl apply --dry-run=client` 会失败在 API discovery，不代表 YAML schema 失败。
+
+构建和加载本地镜像：
+
+```bash
+./mvnw package -DskipTests
+docker build -t spring3/catalog-service:local ./catalog-service
+docker build -t spring3/order-service:local ./order-service
+```
+
+真实部署后验证：
+
+```bash
+kubectl -n spring3 get deploy,svc,pod
+kubectl -n spring3 rollout status deploy/catalog-service
+kubectl -n spring3 rollout status deploy/order-service
+```
+
 ## 实施要点
 
 - K8s 任务依赖 Docker 镜像计划，先有镜像再谈部署。
@@ -38,6 +89,7 @@
 - 文档说明每个资源对象的作用。
 - readiness/liveness 配置合理。
 - 不提交真实 Secret。
+- README、使用说明、实施文档和面试路线包含 Kubernetes 入口。
 
 ## 不做
 
