@@ -49,9 +49,20 @@ class OrderController {
             @RequestParam(defaultValue = "false") boolean failCatalog,
             @RequestParam(defaultValue = "false") boolean rateLimit,
             @RequestParam(defaultValue = "false") boolean bulkhead,
-            @RequestParam(defaultValue = "false") boolean holdBulkhead
+            @RequestParam(defaultValue = "false") boolean holdBulkhead,
+            @RequestParam(defaultValue = "false") boolean sentinelFlow,
+            @RequestParam(defaultValue = "false") boolean sentinelHotSku
     ) {
-        return orderService.preview(request, slowCatalog, failCatalog, rateLimit, bulkhead, holdBulkhead);
+        return orderService.preview(
+                request,
+                slowCatalog,
+                failCatalog,
+                rateLimit,
+                bulkhead,
+                holdBulkhead,
+                sentinelFlow,
+                sentinelHotSku
+        );
     }
 
     @GetMapping("/thread-probe")

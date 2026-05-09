@@ -41,3 +41,50 @@
 
 - 不把 Sentinel 设为默认治理方案。
 - 不接入生产控制台。
+
+## 实施记录
+
+版本兼容确认：
+
+- 官方 Spring Cloud Alibaba 2025.x 版本说明中，`2025.0.x` 适配 Spring Boot `3.5.x` 和 Spring Cloud `2025.0.x`。
+- 组件版本表中，Spring Cloud Alibaba `2025.0.0.0` 对应 Sentinel `1.8.9`、Nacos `3.0.3`。
+- 当前项目为 Spring Boot `3.5.14`、Spring Cloud `2025.0.2`、Spring Cloud Alibaba `2025.0.0.0`，Sentinel starter 使用 `com.alibaba.cloud:spring-cloud-starter-alibaba-sentinel`。
+- 参考文档：
+  - https://sca.aliyun.com/en/docs/2025.x/overview/version-explain/
+  - https://sca.aliyun.com/en/docs/2025.x/user-guide/sentinel/quick-start/
+
+已实现：
+
+- `order-service/pom.xml` 新增 Maven `sentinel` profile，只在 `-Psentinel` 时引入 `spring-cloud-starter-alibaba-sentinel`。
+- `sentinel` Maven profile 通过 `build-helper-maven-plugin` 加入 `src/sentinel/java` 和 `src/sentinel-test/java`，默认构建不编译 Sentinel 专题源码。
+- `application-sentinel.yml` 新增本地规则参数和 Sentinel transport/log 配置。
+- 主代码新增 `OrderTrafficGuard` 抽象和默认 `NoopOrderTrafficGuard`，避免默认 profile 依赖 Sentinel。
+- `POST /api/orders/preview` 新增 `sentinelFlow`、`sentinelHotSku` 两个显式演示开关。
+- `SentinelRuleConfig` 启动时加载：
+  - `order-preview-flow`：QPS 限流。
+  - `order-preview-hot-sku`：热点参数限流。
+  - `order-catalog-degrade-probe`：慢调用比例熔断。
+- `SentinelProbeController` 新增 `GET /api/orders/sentinel/degrade-probe?slow=true`，只在 `sentinel` profile 下存在。
+- `GlobalExceptionHandler` 将 `SentinelBlockedException` 转换为 `429` ProblemDetail，并返回 `resource`、`strategy`。
+- `OrderSentinelProfileTest` 覆盖 Sentinel profile 启动、正常业务路径、QPS 限流、热点参数限流和慢调用熔断探针。
+- 已更新 `README.md`、`docs/USAGE.md`、`docs/IMPLEMENTATION.md`、`docs/interview-roadmap.md`。
+
+已验证：
+
+```bash
+./mvnw -Psentinel -pl order-service -am -Dtest=OrderSentinelProfileTest#degradeProbeOpensAfterSlowCalls -Dsurefire.failIfNoSpecifiedTests=false test
+./mvnw -Psentinel -pl order-service -am -Dtest=OrderSentinelProfileTest -Dsurefire.failIfNoSpecifiedTests=false test
+./mvnw test
+./mvnw -Pnacos test
+./mvnw package -DskipTests
+./mvnw -Psentinel -pl order-service -am package -DskipTests
+```
+
+验证结果：
+
+- `sentinel` profile 可启动，Sentinel starter 注册 WebMVC 拦截器。
+- 默认业务请求不带 Sentinel 演示开关时仍能完成 order -> catalog 调用。
+- `sentinelFlow=true` 连续请求可触发 `strategy=FLOW` 的 `429` ProblemDetail。
+- `sentinelHotSku=true` 同一 `sku` 连续请求可触发 `strategy=HOT_PARAM` 的 `429` ProblemDetail。
+- `/api/orders/sentinel/degrade-probe?slow=true` 连续慢调用可触发 `strategy=DEGRADE` 的 `429` ProblemDetail。
+- 默认 profile、`nacos` profile、默认打包和 Sentinel profile 打包均通过。

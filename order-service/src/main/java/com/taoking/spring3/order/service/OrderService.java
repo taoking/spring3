@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 public class OrderService {
 
     private final CatalogGovernanceService catalogGovernanceService;
+    private final OrderTrafficGuard orderTrafficGuard;
     private final NotificationService notificationService;
     private final ApplicationEventPublisher eventPublisher;
     private final Counter previewCounter;
@@ -24,11 +25,13 @@ public class OrderService {
 
     public OrderService(
             CatalogGovernanceService catalogGovernanceService,
+            OrderTrafficGuard orderTrafficGuard,
             NotificationService notificationService,
             ApplicationEventPublisher eventPublisher,
             MeterRegistry meterRegistry
     ) {
         this.catalogGovernanceService = catalogGovernanceService;
+        this.orderTrafficGuard = orderTrafficGuard;
         this.notificationService = notificationService;
         this.eventPublisher = eventPublisher;
         this.previewCounter = Counter.builder("orders.preview.total")
@@ -46,8 +49,12 @@ public class OrderService {
             boolean failCatalog,
             boolean rateLimit,
             boolean bulkhead,
-            boolean holdBulkhead
+            boolean holdBulkhead,
+            boolean sentinelFlow,
+            boolean sentinelHotSku
     ) {
+        orderTrafficGuard.checkPreviewFlow(sentinelFlow);
+        orderTrafficGuard.checkHotSku(sentinelHotSku, request.sku());
         previewCounter.increment();
         ProductResponse product = getProduct(request, slowCatalog, failCatalog, rateLimit, bulkhead, holdBulkhead);
         if (product.fallback()) {

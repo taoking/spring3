@@ -566,6 +566,137 @@ curl -fsS http://localhost:8080/actuator/prometheus \
 
 当前配置让 TimeLimiter 的 `1s` 小于 Feign read timeout 的 `3s`，因此 `slowCatalog=true` 会优先演示 Resilience4j 超时。RestClient 模式下如果 `demo.clients.catalog.read-timeout` 设置得更短，则 HTTP client 超时会先触发。
 
+## Sentinel 可选专题
+
+Sentinel 作为阿里系服务治理专题单独隔离：默认 profile 不引入 Sentinel 依赖；只有使用 Maven `-Psentinel` 时才会编译 `order-service/src/sentinel/java` 和 `order-service/src/sentinel-test/java`。运行时还需要设置 Spring profile `sentinel`。
+
+版本基线：
+
+| 组件 | 当前版本 |
+| --- | --- |
+| Spring Boot | `3.5.14` |
+| Spring Cloud | `2025.0.2` |
+| Spring Cloud Alibaba | `2025.0.0.0` |
+| Sentinel | `1.8.9` |
+
+Spring Cloud Alibaba 2025.0.x 官方版本说明适配 Spring Boot 3.5.x 和 Spring Cloud 2025.0.x，组件表中 `2025.0.0.0` 对应 Sentinel `1.8.9`。Sentinel starter 为 `com.alibaba.cloud:spring-cloud-starter-alibaba-sentinel`。
+
+本地规则通过 `SentinelRuleConfig` 在 `sentinel` profile 启动时加载，不要求启动 Dashboard：
+
+| 资源 | 触发入口 | 规则 |
+| --- | --- | --- |
+| `order-preview-flow` | `POST /api/orders/preview?sentinelFlow=true` | QPS 限流，默认 `1` |
+| `order-preview-hot-sku` | `POST /api/orders/preview?sentinelHotSku=true` | 按第一个参数 `sku` 做热点参数限流，默认 `1` |
+| `order-catalog-degrade-probe` | `GET /api/orders/sentinel/degrade-probe?slow=true` | 慢调用比例熔断，默认慢调用阈值 `10ms`，探针延迟 `50ms` |
+
+核心配置在 `order-service/src/main/resources/application-sentinel.yml`：
+
+```yaml
+spring:
+  cloud:
+    sentinel:
+      enabled: true
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:localhost:8858}
+        port: ${SENTINEL_TRANSPORT_PORT:8719}
+
+demo:
+  sentinel:
+    flow:
+      qps: 1
+    hot-sku:
+      qps: 1
+      duration: 1s
+    degrade:
+      slow-threshold: 10ms
+      slow-ratio-threshold: 0.5
+      minimum-request-amount: 2
+      stat-interval: 1s
+      time-window: 5s
+      probe-delay: 50ms
+```
+
+启动：
+
+```bash
+./mvnw -Psentinel -pl order-service -am package -DskipTests
+```
+
+```bash
+./mvnw -pl catalog-service spring-boot:run
+```
+
+```bash
+SPRING_PROFILES_ACTIVE=sentinel ./mvnw -Psentinel -pl order-service spring-boot:run
+```
+
+正常业务路径不加 Sentinel 演示开关，仍然走现有 OpenFeign + Resilience4j：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":1}' \
+  http://localhost:8080/api/orders/preview
+```
+
+触发 Sentinel QPS 限流，第二个请求会返回 `429` ProblemDetail，`strategy=FLOW`：
+
+```bash
+for sku in SKU-SENT-FLOW-1 SKU-SENT-FLOW-2; do
+  curl -s -u user:user123 \
+    -H 'Content-Type: application/json' \
+    -d "{\"sku\":\"$sku\",\"quantity\":1}" \
+    'http://localhost:8080/api/orders/preview?sentinelFlow=true'
+  echo
+done
+```
+
+触发热点参数限流，同一个 `sku` 连续请求时第二个请求会返回 `strategy=HOT_PARAM`：
+
+```bash
+for i in 1 2; do
+  curl -s -u user:user123 \
+    -H 'Content-Type: application/json' \
+    -d '{"sku":"SKU-SENT-HOT","quantity":1}' \
+    'http://localhost:8080/api/orders/preview?sentinelHotSku=true'
+  echo
+done
+```
+
+触发 Sentinel 慢调用熔断，连续慢调用后第三次请求会返回 `strategy=DEGRADE`：
+
+```bash
+for i in 1 2 3; do
+  curl -s -u user:user123 \
+    'http://localhost:8080/api/orders/sentinel/degrade-probe?slow=true'
+  echo
+done
+```
+
+自动化验证：
+
+```bash
+./mvnw -Psentinel -pl order-service -am -Dtest=OrderSentinelProfileTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+Sentinel 与 Resilience4j 对比：
+
+| 维度 | Sentinel | Resilience4j |
+| --- | --- | --- |
+| 定位 | 流量治理、热点参数、控制台规则管理、阿里系微服务常见选型 | 应用内轻量治理库，和 Spring Cloud CircuitBreaker 集成自然 |
+| 限流 | QPS、线程数、热点参数、集群限流能力更完整 | RateLimiter 更适合进程内固定速率控制 |
+| 熔断 | 慢调用比例、异常比例、异常数，规则可由控制台或数据源管理 | CircuitBreaker 配置清晰，配合 Retry/TimeLimiter/Bulkhead 组合 |
+| 依赖边界 | 本项目放在 `-Psentinel` + `sentinel` profile，避免默认运行复杂化 | 当前默认治理方案，业务路径长期保留 |
+| 面试重点 | Dashboard/规则下发、热点参数、流控效果、降级返回、集群限流 | 状态机、滑动窗口、fallback、重试顺序、线程隔离和指标 |
+
+排查点：
+
+- 同时使用 Maven `-Psentinel` 和 Spring `SPRING_PROFILES_ACTIVE=sentinel`，缺一不可。
+- Sentinel 本地日志目录可通过 `SENTINEL_LOG_DIR` 设置，默认写入 `${user.home}/logs/csp`。
+- 本项目的 Sentinel 规则是本地内存规则，重启后重新加载；生产环境通常接 Dashboard、Nacos 或 Apollo 等数据源。
+- 当前熔断探针用慢调用比例复现；异常比例和异常数规则可用同一资源模型扩展。
+
 ## OAuth2 Resource Server / JWT
 
 默认 profile 继续使用 Basic Auth。`jwt` profile 会启用 Spring Security OAuth2 Resource Server，支持 `Authorization: Bearer <token>`，并把 JWT 中的 `roles` claim 映射为 `ROLE_USER`、`ROLE_ADMIN`。`scope` claim 会保留为 Spring Security 默认的 `SCOPE_*` 权限。

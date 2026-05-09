@@ -1,0 +1,25 @@
+spring:
+  cloud:
+    sentinel:
+      enabled: true
+      eager: true
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:localhost:8858}
+        port: ${SENTINEL_TRANSPORT_PORT:8719}
+      log:
+        dir: ${SENTINEL_LOG_DIR:${user.home}/logs/csp}
+
+demo:
+  sentinel:
+    flow:
+      qps: 1
+    hot-sku:
+      qps: 1
+      duration: 1s
+    degrade:
+      slow-threshold: 10ms
+      slow-ratio-threshold: 0.5
+      minimum-request-amount: 2
+      stat-interval: 1s
+      time-window: 5s
+      probe-delay: 50ms

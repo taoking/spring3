@@ -20,7 +20,7 @@
 | P0 | AOP 与事务边界 | 代理类型、自调用失效、注解生效条件是高频陷阱 | 当前无数据库事务，可用 AOP 示例延伸说明 |
 | P0 | Spring MVC 请求链路 | DispatcherServlet、Filter、Interceptor、ControllerAdvice、MessageConverter | 当前代码已覆盖核心入口 |
 | P0 | Resilience4j 深化 | Retry、RateLimiter、Bulkhead、TimeLimiter 和 CircuitBreaker 边界常被追问 | 已完成完整治理矩阵、触发参数、fallback 标识和 Prometheus 指标验证；后续可补异常分类和告警规则 |
-| P1 | Sentinel | 阿里系技术栈高频，和 Resilience4j 对比限流、熔断、热点参数 | 后续作为可选专题，不影响默认运行 |
+| P1 | Sentinel | 阿里系技术栈高频，和 Resilience4j 对比限流、熔断、热点参数 | 已完成可选 `sentinel` profile、本地规则、QPS 限流、热点参数、慢调用熔断探针和测试 |
 | P1 | 容器化与探针 | Docker、镜像分层、readiness/liveness、优雅停机 | 已完成两个业务服务镜像、应用 Compose、readiness/liveness、优雅停机和 Prometheus 服务名抓取 |
 | P1 | Java 21 与虚拟线程 | Spring Boot 3 常被追问 Java 17/21 升级收益 | 已完成 `virtual-thread` profile、请求线程和 `@Async` 线程观察接口；后续可补 pinned thread 诊断 |
 | P1 | 结构化日志 | JSON log、MDC、traceId、错误码、日志脱敏是线上排障基本功 | 后续补 logback JSON profile 和请求日志规范 |
@@ -39,6 +39,7 @@
 - 能说明 Spring Security filter chain、认证、授权、CSRF/CORS、方法级权限的边界。
 - 能说明 Feign 超时、重试、熔断、fallback、负载均衡分别在哪一层处理。
 - 能说明 Resilience4j Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 分别解决什么问题，以及彼此不能替代的边界。
+- 能比较 Sentinel 和 Resilience4j：Sentinel 更偏流量治理、热点参数和控制台规则，Resilience4j 更偏应用内轻量治理库。
 - 能比较 OpenFeign、RestClient、WebClient、`@HttpExchange` 的适用场景。
 - 能说明 Prometheus pull 模型、指标命名、label 基数、Grafana dashboard 的关系。
 - 能说明 traceId/spanId、日志、指标、链路追踪如何一起用于排障。

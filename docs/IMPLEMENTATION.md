@@ -24,6 +24,7 @@
 - `catalog-service` 和 `order-service` 镜像可以构建，并能通过本地 Compose 在容器网络中完成服务间调用。
 - 容器版 Prometheus 可以通过服务名抓取业务服务指标。
 - `order-service` 可以通过 `virtual-thread` profile 启用 Java 21 虚拟线程，并保留默认 profile 的传统线程池。
+- `order-service` 可以通过 `-Psentinel` + `sentinel` profile 启用 Sentinel 本地规则，演示限流、热点参数和慢调用熔断。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 项目没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
@@ -65,6 +66,7 @@
 - 虚拟线程：`order-service` 的 `virtual-thread` profile 设置 `spring.threads.virtual.enabled=true`，并把 `demoTaskExecutor` 从默认 `ThreadPoolTaskExecutor` 切换为虚拟线程 `SimpleAsyncTaskExecutor`。
 - 线程观察：`/api/orders/thread-probe` 支持请求线程和 `@Async` 线程两种模式，响应返回线程名、是否虚拟线程和模拟 I/O 等待时长。
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
+- Sentinel 可选专题：通过 `-Psentinel` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=sentinel` 加载本地 Flow、ParamFlow、Degrade 规则。
 
 ### 自定义 starter / autoconfigure
 
@@ -129,6 +131,28 @@ demo:
 - 所有治理 fallback 统一复用 `CatalogFallbackSupport`，响应体中的 `fallback=true` 与 `fallbackUsed=true` 会明确告诉调用方发生了降级。
 
 配置集中在 `order-service/src/main/resources/application.yml` 的 `resilience4j.*` 和 `demo.resilience.catalog.*` 下。当前 TimeLimiter 为 `1s`，Feign read timeout 为 `3s`，因此慢调用演示优先由 Resilience4j 截断；如果 HTTP client timeout 更短，则会先走 client timeout。
+
+### Sentinel 可选专题
+
+Sentinel 只在 `order-service` 的 Maven `sentinel` profile 中引入：
+
+- `spring-cloud-starter-alibaba-sentinel` 由 Spring Cloud Alibaba BOM 管理，当前版本基线为 Spring Cloud Alibaba `2025.0.0.0` + Sentinel `1.8.9`。
+- `build-helper-maven-plugin` 只在 `-Psentinel` 时把 `src/sentinel/java` 和 `src/sentinel-test/java` 加入编译，默认 `./mvnw test` 不编译 Sentinel 专题源码。
+- `application-sentinel.yml` 只在 `SPRING_PROFILES_ACTIVE=sentinel` 时加载，设置 Sentinel transport、日志目录和本地规则参数。
+
+主代码通过无 Sentinel 依赖的 `OrderTrafficGuard` 抽象隔离：
+
+- 默认 profile 使用 `NoopOrderTrafficGuard`，`sentinelFlow`、`sentinelHotSku` 参数不改变默认行为。
+- `sentinel` profile 使用 `SentinelOrderTrafficGuard`，通过 Sentinel `SphU.entry(...)` 显式进入资源。
+- `GlobalExceptionHandler` 把 `SentinelBlockedException` 转换为 `429` ProblemDetail，并返回 `resource`、`strategy` 等排查字段。
+
+当前本地规则：
+
+- `order-preview-flow`：`POST /api/orders/preview?sentinelFlow=true`，默认 QPS `1`。
+- `order-preview-hot-sku`：`POST /api/orders/preview?sentinelHotSku=true`，按 `sku` 热点参数限流。
+- `order-catalog-degrade-probe`：`GET /api/orders/sentinel/degrade-probe?slow=true`，通过慢调用比例触发 Sentinel Degrade。
+
+Sentinel 与 Resilience4j 的定位刻意并存：Resilience4j 保持默认服务治理路径，Sentinel 作为阿里系流控/热点参数/规则中心专题，用独立 profile 防止默认启动门槛升高。
 
 ### JWT profile
 
@@ -258,6 +282,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `.github/workflows/ci.yml` 包含 `unit-tests` 和 `integration-tests` 两个 job，分别覆盖默认测试和 Docker 集成测试。
 - `deployment/docker-compose.yml` 使用 Actuator readiness 作为容器 healthcheck，验证本地容器化部署链路。
 - `order-service` 增加 `OrderVirtualThreadProfileTest`，覆盖 `virtual-thread` profile 下订单预览正常路径和 `@Async` 虚拟线程观察接口。
+- `order-service` 增加 `OrderSentinelProfileTest`，在 `-Psentinel` 下覆盖 Sentinel profile 启动、默认业务路径、QPS 限流、热点参数限流和慢调用熔断探针。
 - Feign 测试使用 MockWebServer，不依赖公网和手动启动 provider。
 
 ## 明确不做
@@ -266,6 +291,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - 不接入 Redis 或 Spring Session Redis。
 - 不实现 Kafka、RabbitMQ、RocketMQ 代码。
 - 不把 Nacos 作为默认 profile 的必需依赖。
+- 不把 Sentinel 作为默认 profile 的必需依赖。
 - 不把 Zipkin 作为业务服务启动的硬依赖。
 - 不提交真实 Sentry DSN。
 - 不做前端页面，只使用 REST API、Swagger UI、Prometheus、Grafana 和 Zipkin。

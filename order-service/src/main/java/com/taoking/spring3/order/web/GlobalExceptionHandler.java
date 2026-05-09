@@ -1,6 +1,7 @@
 package com.taoking.spring3.order.web;
 
 import com.taoking.spring3.common.dto.FieldErrorResponse;
+import com.taoking.spring3.order.service.SentinelBlockedException;
 import io.sentry.Sentry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -43,6 +44,17 @@ class GlobalExceptionHandler {
         detail.setTitle("Forbidden");
         detail.setType(URI.create("https://spring3.local/problems/forbidden"));
         detail.setProperty("path", request.getRequestURI());
+        return detail;
+    }
+
+    @ExceptionHandler(SentinelBlockedException.class)
+    ProblemDetail handleSentinelBlocked(SentinelBlockedException ex, HttpServletRequest request) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, "Sentinel request blocked");
+        detail.setTitle("Sentinel blocked");
+        detail.setType(URI.create("https://spring3.local/problems/sentinel-blocked"));
+        detail.setProperty("path", request.getRequestURI());
+        detail.setProperty("resource", ex.resource());
+        detail.setProperty("strategy", ex.strategy());
         return detail;
     }
 
