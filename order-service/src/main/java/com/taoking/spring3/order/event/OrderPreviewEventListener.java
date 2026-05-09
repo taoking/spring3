@@ -25,8 +25,11 @@ class OrderPreviewEventListener {
     @EventListener
     void onOrderPreviewCreated(OrderPreviewCreatedEvent event) {
         eventCounter.increment();
-        log.info("Handled order preview event orderId={} createdAt={}",
+        Thread thread = Thread.currentThread();
+        log.info("Handled order preview event orderId={} createdAt={} thread={} virtual={}",
                 event.preview().orderId(),
-                event.createdAt());
+                event.createdAt(),
+                thread.getName(),
+                thread.isVirtual());
     }
 }

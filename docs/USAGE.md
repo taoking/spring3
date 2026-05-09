@@ -227,6 +227,70 @@ java -jar order-service/target/order-service-0.0.1-SNAPSHOT.jar \
 
 也可以在业务服务启动时加上 `--debug` 查看 Spring Boot condition evaluation report，搜索 `DemoLogAutoConfiguration`。
 
+## Java 21 虚拟线程
+
+默认 profile 保留传统 `ThreadPoolTaskExecutor`：
+
+| Bean | 默认 profile | `virtual-thread` profile |
+| --- | --- | --- |
+| `demoTaskExecutor` | `ThreadPoolTaskExecutor`，线程名前缀 `demo-async-` | `SimpleAsyncTaskExecutor` + virtual threads，线程名前缀 `demo-vt-` |
+| Web request thread | 平台线程 | `spring.threads.virtual.enabled=true` 后由 Spring Boot 使用虚拟线程 |
+| Resilience4j TimeLimiter executor | 固定平台线程池 `catalog-governance-*` | 保持不变，用于演示治理隔离边界 |
+
+启动虚拟线程 profile：
+
+```bash
+SPRING_PROFILES_ACTIVE=virtual-thread ./mvnw -pl order-service spring-boot:run
+```
+
+先启动 `catalog-service`，再请求订单预览：
+
+```bash
+./mvnw -pl catalog-service spring-boot:run
+
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8080/api/orders/preview
+```
+
+观察请求线程：
+
+```bash
+curl -u user:user123 'http://localhost:8080/api/orders/thread-probe?delayMs=100'
+```
+
+观察 `@Async` 线程：
+
+```bash
+curl -u user:user123 'http://localhost:8080/api/orders/thread-probe?async=true&delayMs=100'
+```
+
+响应包含 `threadName` 和 `virtual`：
+
+```json
+{"mode":"async","threadName":"demo-vt-1","virtual":true,"delayMs":100}
+```
+
+日志观察点：
+
+```bash
+tail -f order-service/target/run.log | grep -E 'Thread probe|Async notification|Handled order preview'
+```
+
+适用场景：
+
+- 适合阻塞 I/O 密集路径，例如等待 HTTP、文件、网络或短暂 sleep 的演示接口。
+- 不会让 CPU 密集计算自动变快，CPU 仍然是瓶颈。
+- 需要关注 `ThreadLocal`、MDC、第三方 SDK 和同步锁导致的 pinned thread。
+- 本项目保留 Resilience4j TimeLimiter 固定线程池，便于对比虚拟线程和治理隔离线程池的边界。
+
+验证命令：
+
+```bash
+./mvnw -pl order-service -am -Dtest=OrderVirtualThreadProfileTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
 ## 前台启动服务
 
 分别打开两个终端：

@@ -22,7 +22,7 @@
 | P0 | Resilience4j 深化 | Retry、RateLimiter、Bulkhead、TimeLimiter 和 CircuitBreaker 边界常被追问 | 已完成完整治理矩阵、触发参数、fallback 标识和 Prometheus 指标验证；后续可补异常分类和告警规则 |
 | P1 | Sentinel | 阿里系技术栈高频，和 Resilience4j 对比限流、熔断、热点参数 | 后续作为可选专题，不影响默认运行 |
 | P1 | 容器化与探针 | Docker、镜像分层、readiness/liveness、优雅停机 | 已完成两个业务服务镜像、应用 Compose、readiness/liveness、优雅停机和 Prometheus 服务名抓取 |
-| P1 | Java 21 与虚拟线程 | Spring Boot 3 常被追问 Java 17/21 升级收益 | 后续可加一个虚拟线程配置示例 |
+| P1 | Java 21 与虚拟线程 | Spring Boot 3 常被追问 Java 17/21 升级收益 | 已完成 `virtual-thread` profile、请求线程和 `@Async` 线程观察接口；后续可补 pinned thread 诊断 |
 | P1 | 结构化日志 | JSON log、MDC、traceId、错误码、日志脱敏是线上排障基本功 | 后续补 logback JSON profile 和请求日志规范 |
 | P1 | API 治理 | API versioning、统一错误码、OpenAPI 分组、接口兼容性体现长期维护能力 | 后续补文档和少量代码示例 |
 | P1 | Spring Cloud Contract | 微服务 provider/consumer 变更风险控制 | 后续在 order/catalog 间补契约测试 |

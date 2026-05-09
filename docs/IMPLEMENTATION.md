@@ -23,6 +23,7 @@
 - GitHub Actions 分别执行默认单元测试和 Docker 集成测试。
 - `catalog-service` 和 `order-service` 镜像可以构建，并能通过本地 Compose 在容器网络中完成服务间调用。
 - 容器版 Prometheus 可以通过服务名抓取业务服务指标。
+- `order-service` 可以通过 `virtual-thread` profile 启用 Java 21 虚拟线程，并保留默认 profile 的传统线程池。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 项目没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
@@ -61,6 +62,8 @@
 - CI：GitHub Actions 使用 JDK 21 和 Maven cache，默认 job 运行 `./mvnw -B test`，Docker job 运行 `./mvnw -B -Pintegration-test verify`。
 - 容器化：`catalog-service/Dockerfile` 和 `order-service/Dockerfile` 使用 JDK 21 JRE Alpine 镜像、非 root 用户和 `JAVA_OPTS`；`deployment/docker-compose.yml` 启动两个业务服务、Prometheus、Grafana、Zipkin。
 - 容器网络：`order-service` 在 Compose 中通过 `DEMO_CLIENTS_CATALOG_BASE_URL=http://catalog-service:8081` 调用 `catalog-service`，Prometheus 通过 `catalog-service:8081` 和 `order-service:8080` 抓取指标。
+- 虚拟线程：`order-service` 的 `virtual-thread` profile 设置 `spring.threads.virtual.enabled=true`，并把 `demoTaskExecutor` 从默认 `ThreadPoolTaskExecutor` 切换为虚拟线程 `SimpleAsyncTaskExecutor`。
+- 线程观察：`/api/orders/thread-probe` 支持请求线程和 `@Async` 线程两种模式，响应返回线程名、是否虚拟线程和模拟 I/O 等待时长。
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
 
 ### 自定义 starter / autoconfigure
@@ -254,6 +257,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `gateway-service` 增加 Testcontainers 集成测试，使用 `nginx:1.27.3-alpine` 作为容器化下游，覆盖真实 Gateway 路由到外部依赖的路径。
 - `.github/workflows/ci.yml` 包含 `unit-tests` 和 `integration-tests` 两个 job，分别覆盖默认测试和 Docker 集成测试。
 - `deployment/docker-compose.yml` 使用 Actuator readiness 作为容器 healthcheck，验证本地容器化部署链路。
+- `order-service` 增加 `OrderVirtualThreadProfileTest`，覆盖 `virtual-thread` profile 下订单预览正常路径和 `@Async` 虚拟线程观察接口。
 - Feign 测试使用 MockWebServer，不依赖公网和手动启动 provider。
 
 ## 明确不做

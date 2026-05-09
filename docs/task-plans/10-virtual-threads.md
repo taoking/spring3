@@ -41,3 +41,29 @@
 
 - 不做复杂压测平台。
 - 不把所有线程池配置永久替换为虚拟线程。
+
+## 实施记录
+
+- 已新增 `order-service/src/main/resources/application-virtual-thread.yml`，设置 `spring.threads.virtual.enabled=true`。
+- 已调整 `AsyncConfig`：默认 profile 继续使用 `ThreadPoolTaskExecutor`，`virtual-thread` profile 使用虚拟线程 `SimpleAsyncTaskExecutor`，线程名前缀为 `demo-vt-`。
+- 已新增 `ThreadProbeService` 和 `/api/orders/thread-probe`，支持请求线程和 `@Async` 线程两种 I/O 等待观察模式。
+- 已增强 `NotificationService` 和 `OrderPreviewEventListener` 日志，输出当前线程名和 `virtual` 标识。
+- 已新增 `OrderVirtualThreadProfileTest`，覆盖 `virtual-thread` profile 下订单预览正常路径、请求线程探针和异步虚拟线程探针。
+- 已更新 `README.md`、`docs/USAGE.md`、`docs/IMPLEMENTATION.md`、`docs/interview-roadmap.md`。
+
+已验证：
+
+```bash
+./mvnw -pl order-service -am -Dtest=OrderVirtualThreadProfileTest -Dsurefire.failIfNoSpecifiedTests=false test
+./mvnw test
+./mvnw -Pnacos test
+./mvnw package -DskipTests
+```
+
+验证结果：
+
+- `virtual-thread` profile 能加载并启动 `order-service` 测试上下文。
+- 订单预览正常返回，MockWebServer 收到 catalog 请求。
+- `/api/orders/thread-probe?delayMs=1` 返回请求线程元信息。
+- `/api/orders/thread-probe?async=true&delayMs=1` 返回 `threadName=demo-vt-*` 且 `virtual=true`。
+- 默认 profile、`nacos` profile 和跳过测试打包均通过，profile 切换未影响现有业务测试。

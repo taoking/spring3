@@ -26,7 +26,11 @@ public class NotificationService {
             Thread.currentThread().interrupt();
             return CompletableFuture.failedFuture(ex);
         }
-        log.info("Async notification finished for orderId={}", orderId);
+        Thread thread = Thread.currentThread();
+        log.info("Async notification finished for orderId={} thread={} virtual={}",
+                orderId,
+                thread.getName(),
+                thread.isVirtual());
         return CompletableFuture.completedFuture(null);
     }
 }

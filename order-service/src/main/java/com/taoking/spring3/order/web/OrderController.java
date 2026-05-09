@@ -5,9 +5,14 @@ import com.taoking.spring3.common.dto.OrderPreviewResponse;
 import com.taoking.spring3.order.config.CatalogClientProperties;
 import com.taoking.spring3.order.config.OrderProperties;
 import com.taoking.spring3.order.service.OrderService;
+import com.taoking.spring3.order.service.ThreadProbeResponse;
+import com.taoking.spring3.order.service.ThreadProbeService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.util.Map;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,18 +22,22 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/orders")
+@Validated
 class OrderController {
 
     private final OrderService orderService;
+    private final ThreadProbeService threadProbeService;
     private final OrderProperties orderProperties;
     private final CatalogClientProperties catalogClientProperties;
 
     OrderController(
             OrderService orderService,
+            ThreadProbeService threadProbeService,
             OrderProperties orderProperties,
             CatalogClientProperties catalogClientProperties
     ) {
         this.orderService = orderService;
+        this.threadProbeService = threadProbeService;
         this.orderProperties = orderProperties;
         this.catalogClientProperties = catalogClientProperties;
     }
@@ -43,6 +52,17 @@ class OrderController {
             @RequestParam(defaultValue = "false") boolean holdBulkhead
     ) {
         return orderService.preview(request, slowCatalog, failCatalog, rateLimit, bulkhead, holdBulkhead);
+    }
+
+    @GetMapping("/thread-probe")
+    ThreadProbeResponse threadProbe(
+            @RequestParam(defaultValue = "100") @Min(0) @Max(5000) long delayMs,
+            @RequestParam(defaultValue = "false") boolean async
+    ) {
+        if (async) {
+            return threadProbeService.waitOnAsyncExecutor(delayMs).join();
+        }
+        return threadProbeService.waitOnRequestThread(delayMs);
     }
 
     @GetMapping("/admin/stats")
