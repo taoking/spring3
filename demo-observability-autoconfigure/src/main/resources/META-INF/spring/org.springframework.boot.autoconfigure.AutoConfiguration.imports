@@ -1,1 +1,2 @@
 com.taoking.spring3.observability.autoconfigure.DemoLogAutoConfiguration
+com.taoking.spring3.observability.autoconfigure.DemoHttpRequestLoggingAutoConfiguration

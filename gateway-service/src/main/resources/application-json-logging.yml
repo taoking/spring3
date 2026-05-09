@@ -1,0 +1,9 @@
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      context:
+        include: true
+      add:
+        application: ${spring.application.name}

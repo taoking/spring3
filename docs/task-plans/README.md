@@ -24,7 +24,7 @@
 | 9 | Docker 镜像与部署（基线已完成） | [09-container-deployment.md](09-container-deployment.md) | P1 |
 | 10 | Java 21 虚拟线程（基线已完成） | [10-virtual-threads.md](10-virtual-threads.md) | P1 |
 | 11 | Sentinel（基线已完成） | [11-sentinel.md](11-sentinel.md) | P1 |
-| 12 | 结构化日志 | [12-structured-logging.md](12-structured-logging.md) | P1 |
+| 12 | 结构化日志（基线已完成） | [12-structured-logging.md](12-structured-logging.md) | P1 |
 | 13 | API 治理 | [13-api-governance.md](13-api-governance.md) | P1 |
 | 14 | Spring Cloud Contract | [14-contract-testing.md](14-contract-testing.md) | P1 |
 | 15 | 消息队列 | [15-messaging.md](15-messaging.md) | P2 |

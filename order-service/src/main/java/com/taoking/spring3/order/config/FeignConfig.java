@@ -7,9 +7,11 @@ import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.StringUtils;
 
 @Configuration
 class FeignConfig {
@@ -37,6 +39,16 @@ class FeignConfig {
             TraceContext context = tracer.currentTraceContext().context();
             if (context != null) {
                 propagator.inject(context, requestTemplate, setter);
+            }
+        };
+    }
+
+    @Bean
+    RequestInterceptor requestIdRequestInterceptor() {
+        return requestTemplate -> {
+            String requestId = MDC.get("requestId");
+            if (StringUtils.hasText(requestId)) {
+                requestTemplate.header("X-Request-Id", requestId);
             }
         };
     }

@@ -144,6 +144,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Docker 镜像与部署：已新增 `catalog-service`、`order-service` Dockerfile 和 `deployment/docker-compose.yml`，容器网络内使用服务名调用，并提供 Prometheus 服务名抓取配置。
 - Java 21 虚拟线程：已新增 `virtual-thread` profile、虚拟线程版 `demoTaskExecutor`、阻塞 I/O 观察接口和 profile 回归测试；默认 profile 仍使用传统线程池。
 - Sentinel：已新增独立 `sentinel` Maven/Spring profile、本地内存规则、QPS 限流、热点参数、慢调用熔断探针和 profile 回归测试；默认 profile 不引入 Sentinel 依赖。
+- 结构化日志：已新增 `json-logging` profile，使用 Spring Boot 3.5 内建 structured logging 输出 JSON，并补充 requestId、traceId、spanId、status、elapsedMs 和敏感头脱敏测试。
 
 ### 后续计划
 
@@ -165,7 +166,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Docker 镜像与部署：已完成两个业务服务镜像、应用 Compose、readiness/liveness、优雅停机、JVM 参数和容器网络 Prometheus；后续可补镜像 SBOM 和 registry 发布流程。
 - Java 21 虚拟线程：已完成 `virtual-thread` profile、请求线程和 `@Async` 线程观察接口；后续可补简单并发脚本和 pinned thread 诊断示例。
 - Sentinel：已完成可选 `sentinel` profile、QPS 限流、热点参数、慢调用熔断探针和 Resilience4j 对比；后续可补 Dashboard/Nacos 动态规则和集群限流。
-- 结构化日志：补充 JSON log、MDC、traceId、错误码和请求日志脱敏。
+- 结构化日志：已完成 `json-logging` profile、Servlet 请求日志过滤器、Gateway 结构化审计字段和敏感头脱敏；后续可补 Loki/ELK 查询样例和统一错误码字段。
 - API 治理：补充 API versioning、统一错误码、OpenAPI 分组和接口兼容策略。
 - Spring Cloud Contract：补充服务间契约测试，降低 provider/consumer 变更风险。
 

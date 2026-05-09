@@ -50,15 +50,22 @@ class RequestAuditGlobalFilter implements GlobalFilter, Ordered {
                     long elapsedMs = Duration.between(startedAt, Instant.now()).toMillis();
                     Route route = mutatedExchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
                     HttpStatusCode status = mutatedExchange.getResponse().getStatusCode();
-                    log.info(
-                            "gateway requestId={} traceId={} spanId={} routeId={} status={} elapsedMs={}",
-                            requestId,
-                            traceIds.traceId(),
-                            traceIds.spanId(),
-                            route == null ? "unmatched" : route.getId(),
-                            status == null ? "NA" : status.value(),
-                            elapsedMs
-                    );
+                    String routeId = route == null ? "unmatched" : route.getId();
+                    String statusValue = status == null ? "NA" : String.valueOf(status.value());
+                    log.atInfo()
+                            .addKeyValue("event", "gateway.request")
+                            .addKeyValue("requestId", requestId)
+                            .addKeyValue("traceAvailable", traceIds.isAvailable())
+                            .addKeyValue("routeId", routeId)
+                            .addKeyValue("status", statusValue)
+                            .addKeyValue("elapsedMs", elapsedMs)
+                            .log("gateway requestId={} traceId={} spanId={} routeId={} status={} elapsedMs={}",
+                                    requestId,
+                                    traceIds.traceId(),
+                                    traceIds.spanId(),
+                                    routeId,
+                                    statusValue,
+                                    elapsedMs);
                 });
     }
 
@@ -89,6 +96,10 @@ class RequestAuditGlobalFilter implements GlobalFilter, Ordered {
     }
 
     private record TraceIds(String traceId, String spanId) {
+        boolean isAvailable() {
+            return !"-".equals(traceId) && !"-".equals(spanId);
+        }
+
         static TraceIds empty() {
             return new TraceIds("-", "-");
         }

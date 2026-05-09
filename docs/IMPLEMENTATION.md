@@ -25,6 +25,7 @@
 - 容器版 Prometheus 可以通过服务名抓取业务服务指标。
 - `order-service` 可以通过 `virtual-thread` profile 启用 Java 21 虚拟线程，并保留默认 profile 的传统线程池。
 - `order-service` 可以通过 `-Psentinel` + `sentinel` profile 启用 Sentinel 本地规则，演示限流、热点参数和慢调用熔断。
+- 三个服务可以通过 `json-logging` profile 输出 JSON 日志，Servlet 服务请求日志包含 requestId、traceId、spanId、status、elapsedMs，并验证敏感认证头不会原样输出。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 项目没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
@@ -57,6 +58,7 @@
 - 定时任务：`@Scheduled` 心跳任务。
 - 观测：Actuator、Micrometer、Prometheus registry、自定义 Counter、Micrometer Tracing、Zipkin。
 - Trace 传播：Web MVC/WebFlux 入口自动生成或接收 W3C trace context，`order-service` 的 Feign 配置把当前 trace context 注入出站请求。
+- 结构化日志：`json-logging` profile 使用 Spring Boot 3.5 内建 structured logging 输出 logstash JSON，Servlet 请求日志由 observability starter 自动配置。
 - 错误上报：Sentry Jakarta starter，DSN 通过环境变量读取。
 - API 文档：SpringDoc OpenAPI / Swagger UI。
 - 集成测试：`integration-test` Maven profile 使用 Failsafe 运行 `**/*IT.java`，当前通过 Testcontainers 启动固定版本 Nginx 容器验证 Gateway 真实下游。
@@ -67,12 +69,15 @@
 - 线程观察：`/api/orders/thread-probe` 支持请求线程和 `@Async` 线程两种模式，响应返回线程名、是否虚拟线程和模拟 I/O 等待时长。
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
 - Sentinel 可选专题：通过 `-Psentinel` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=sentinel` 加载本地 Flow、ParamFlow、Degrade 规则。
+- JSON 日志专题：`json-logging` profile 开启 `logging.structured.format.console=logstash` 和 `demo.observability.http-logging.enabled=true`。
 
 ### 自定义 starter / autoconfigure
 
 `@DemoLog` 能力已从 `catalog-service` 和 `order-service` 的重复 `LoggingAspect` 迁移到演示型 starter：
 
 - `demo-observability-autoconfigure`：提供 `DemoLogAutoConfiguration`、`DemoLogAspect`、`DemoLogReporter`、`DemoLogProperties`。
+- `DemoHttpRequestLoggingAutoConfiguration`：在 Servlet Web 应用、`demo.observability.http-logging.enabled=true` 且 classpath 存在 Spring Web 时注册请求日志过滤器。
+- `DemoHttpRequestLoggingFilter`：生成或透传 `X-Request-Id`，写回响应头，把 `requestId` 放入 MDC，并记录 `event`、`method`、`path`、`status`、`elapsedMs`、`authScheme` 等结构化字段。
 - `demo-observability-spring-boot-starter`：聚合 autoconfigure 和 `spring-boot-starter-aop`，业务服务只依赖 starter。
 - `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`：Spring Boot 3 自动配置注册入口。
 
@@ -81,6 +86,7 @@
 - classpath 存在 `DemoLog`、AspectJ `@Aspect`、`ProceedingJoinPoint`。
 - `demo.observability.demolog.enabled=true` 或未配置。
 - 不存在用户自定义的 `DemoLogReporter` 或 `DemoLogAspect` 时才创建默认 Bean。
+- `demo.observability.http-logging.enabled=true` 时才启用请求日志过滤器，默认 profile 不新增入口请求日志。
 
 配置入口：
 
@@ -99,6 +105,7 @@ demo:
 - 用户自定义 `DemoLogReporter` 时默认 reporter 退让。
 - 用户自定义 `DemoLogAspect` 时默认 aspect 退让。
 - 服务模块引入 starter 后，原 `@DemoLog` 行为保持。
+- `OrderJsonLoggingProfileTest` 覆盖 `json-logging` profile、`X-Request-Id` 响应头、JSON 请求日志字段和敏感认证头脱敏。
 
 ### HTTP client 模式
 
@@ -277,6 +284,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `order-service` 增加 RestClient 模式测试，覆盖正常调用、Basic Auth 出站、500 fallback 和读超时 fallback。
 - `order-service` 增加 Resilience4j 集成测试，覆盖 Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 触发方式，并验证 Prometheus 暴露对应指标。
 - `order-service` 增加 JWT profile 测试，覆盖无 token、错误 token、普通用户 token、管理员 token，并验证服务间调用仍使用 Basic。
+- `order-service` 增加 `OrderJsonLoggingProfileTest`，覆盖 `json-logging` profile 输出合法 JSON、生成 `X-Request-Id`、请求日志字段和 `Authorization`/password 脱敏。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - `gateway-service` 增加 Testcontainers 集成测试，使用 `nginx:1.27.3-alpine` 作为容器化下游，覆盖真实 Gateway 路由到外部依赖的路径。
 - `.github/workflows/ci.yml` 包含 `unit-tests` 和 `integration-tests` 两个 job，分别覆盖默认测试和 Docker 集成测试。
@@ -294,4 +302,5 @@ docker compose -f platform/nacos/docker-compose.yml config
 - 不把 Sentinel 作为默认 profile 的必需依赖。
 - 不把 Zipkin 作为业务服务启动的硬依赖。
 - 不提交真实 Sentry DSN。
+- 不在 INFO 请求日志输出请求体、密码、token 或 `Authorization` 原文。
 - 不做前端页面，只使用 REST API、Swagger UI、Prometheus、Grafana 和 Zipkin。

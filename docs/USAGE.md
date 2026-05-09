@@ -1009,6 +1009,89 @@ rg "$TRACE_ID" gateway-service/target/run.log order-service/target/run.log catal
 - `order-service/src/main/java/com/taoking/spring3/order/config/FeignConfig.java`：Feign 出站请求注入当前 trace context。
 - `order-service/src/test/java/com/taoking/spring3/order/web/OrderControllerTest.java`：验证 `traceparent` 传播到 catalog client。
 
+## 结构化日志
+
+`json-logging` profile 使用 Spring Boot 3.5 内建 structured logging，不额外引入 logback encoder。默认 profile 仍保留普通文本日志；只有启用 `SPRING_PROFILES_ACTIVE=json-logging` 时才输出 JSON 到 console。
+
+配置文件：
+
+| 服务 | 配置 |
+| --- | --- |
+| `catalog-service` | `catalog-service/src/main/resources/application-json-logging.yml` |
+| `order-service` | `order-service/src/main/resources/application-json-logging.yml` |
+| `gateway-service` | `gateway-service/src/main/resources/application-json-logging.yml` |
+
+核心配置：
+
+```yaml
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      context:
+        include: true
+      add:
+        application: ${spring.application.name}
+
+demo:
+  observability:
+    http-logging:
+      enabled: true
+      request-id-header: X-Request-Id
+```
+
+启动示例：
+
+```bash
+SPRING_PROFILES_ACTIVE=json-logging ./mvnw -pl catalog-service spring-boot:run
+```
+
+```bash
+SPRING_PROFILES_ACTIVE=json-logging ./mvnw -pl order-service spring-boot:run
+```
+
+发起请求：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":1}' \
+  http://localhost:8080/api/orders/preview
+```
+
+查看 JSON 请求日志：
+
+```bash
+SPRING_PROFILES_ACTIVE=json-logging ./mvnw -pl order-service spring-boot:run 2>&1 \
+  | jq -R 'fromjson? | select(.message=="http request completed")'
+```
+
+请求日志字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `application` | `spring.application.name` |
+| `requestId` | 来自 `X-Request-Id`，没有则自动生成并写回响应头 |
+| `traceId` / `spanId` | Micrometer Tracing 写入 MDC 后由 structured logging 输出 |
+| `event` | `http.request` 或 `gateway.request` |
+| `method` / `path` | HTTP 方法和路径，不记录 query string 和请求体 |
+| `status` / `elapsedMs` | 响应状态码和耗时 |
+| `authScheme` | 只记录 `Basic`、`Bearer` 等认证类型，不记录凭证原文 |
+
+脱敏规则：
+
+- 不记录完整请求体。
+- 不记录 `Authorization` 原文，只记录认证 scheme。
+- 不记录 password、token、secret 等 query 参数；当前请求日志只记录 path，不记录 query string。
+- JSON 日志会包含 MDC 中的 `traceId`、`spanId`、`requestId`，便于和 Zipkin、Prometheus 告警、错误响应关联。
+
+自动化验证：
+
+```bash
+./mvnw -pl order-service -am -Dtest=OrderJsonLoggingProfileTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
 ## Nacos
 
 Nacos 是可选专题，默认 profile 不依赖 Nacos。只有同时使用 Maven `-Pnacos` 和 Spring `SPRING_PROFILES_ACTIVE=nacos` 时才启用 Nacos。

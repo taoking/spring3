@@ -23,7 +23,7 @@
 | P1 | Sentinel | 阿里系技术栈高频，和 Resilience4j 对比限流、熔断、热点参数 | 已完成可选 `sentinel` profile、本地规则、QPS 限流、热点参数、慢调用熔断探针和测试 |
 | P1 | 容器化与探针 | Docker、镜像分层、readiness/liveness、优雅停机 | 已完成两个业务服务镜像、应用 Compose、readiness/liveness、优雅停机和 Prometheus 服务名抓取 |
 | P1 | Java 21 与虚拟线程 | Spring Boot 3 常被追问 Java 17/21 升级收益 | 已完成 `virtual-thread` profile、请求线程和 `@Async` 线程观察接口；后续可补 pinned thread 诊断 |
-| P1 | 结构化日志 | JSON log、MDC、traceId、错误码、日志脱敏是线上排障基本功 | 后续补 logback JSON profile 和请求日志规范 |
+| P1 | 结构化日志 | JSON log、MDC、traceId、错误码、日志脱敏是线上排障基本功 | 已完成 `json-logging` profile、请求日志过滤器、requestId 响应头、敏感头脱敏测试；后续补日志平台查询样例 |
 | P1 | API 治理 | API versioning、统一错误码、OpenAPI 分组、接口兼容性体现长期维护能力 | 后续补文档和少量代码示例 |
 | P1 | Spring Cloud Contract | 微服务 provider/consumer 变更风险控制 | 后续在 order/catalog 间补契约测试 |
 | P2 | 消息队列 | Kafka/RabbitMQ/RocketMQ 的投递语义、幂等、重试、顺序消息 | 只保留路线，不引入运行依赖 |
@@ -43,6 +43,7 @@
 - 能比较 OpenFeign、RestClient、WebClient、`@HttpExchange` 的适用场景。
 - 能说明 Prometheus pull 模型、指标命名、label 基数、Grafana dashboard 的关系。
 - 能说明 traceId/spanId、日志、指标、链路追踪如何一起用于排障。
+- 能说明结构化日志字段设计、MDC、requestId、traceId/spanId 和敏感字段脱敏策略。
 - 能说明服务注册和配置中心在故障场景下的降级策略。
 - 能说明 Gateway 在认证、鉴权、路由、限流、跨域、灰度上的职责边界。
 - 能说明 JWT/OAuth2 Resource Server 的认证与授权流程，以及和 session 登录的差异。

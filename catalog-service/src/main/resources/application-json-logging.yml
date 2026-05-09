@@ -1,0 +1,15 @@
+demo:
+  observability:
+    http-logging:
+      enabled: true
+      request-id-header: X-Request-Id
+
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      context:
+        include: true
+      add:
+        application: ${spring.application.name}
