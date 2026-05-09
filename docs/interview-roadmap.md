@@ -27,7 +27,7 @@
 | P1 | API 治理 | API versioning、统一错误码、OpenAPI 分组、接口兼容性体现长期维护能力 | 后续补文档和少量代码示例 |
 | P1 | Spring Cloud Contract | 微服务 provider/consumer 变更风险控制 | 后续在 order/catalog 间补契约测试 |
 | P2 | 消息队列 | Kafka/RabbitMQ/RocketMQ 的投递语义、幂等、重试、顺序消息 | 只保留路线，不引入运行依赖 |
-| P2 | Testcontainers | 集成测试、外部依赖隔离、CI 可重复性 | 后续可用于 Nacos/Gateway 等可选专题 |
+| P2 | Testcontainers | 集成测试、外部依赖隔离、CI 可重复性 | 已完成 Gateway 下游容器集成测试和 GitHub Actions；后续可扩展到 Nacos |
 | P2 | Native Image/AOT | Spring Boot 3 亮点之一，适合了解限制和收益 | 后续可加文档，不必默认构建 |
 | P2 | Kubernetes | 部署、探针、滚动发布、配置注入会被问，但本项目不急于维护完整 YAML | 先补部署说明，后续视需要加示例 |
 

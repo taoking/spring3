@@ -44,3 +44,23 @@
 
 - 不强制所有开发机器都运行集成测试。
 - 不引入数据库或 Redis 作为测试依赖。
+
+## 实施记录
+
+- 已新增父工程 `integration-test` Maven profile，使用 Maven Failsafe 运行 `**/*IT.java`。
+- 已在 `gateway-service` 加入 Testcontainers JUnit Jupiter 测试依赖。
+- 已新增 `GatewayNginxContainerIT`，使用固定镜像 `nginx:1.27.3-alpine` 作为真实下游容器，验证 Gateway `/catalog/**` 路由。
+- 已新增 `gateway-service/src/test/resources/testcontainers/nginx-default.conf`，提供容器内测试响应和 health endpoint。
+- 已新增 `.github/workflows/ci.yml`，包含 `unit-tests` 和 `integration-tests` 两个 job，均使用 JDK 21 和 Maven cache。
+- 已更新 `README.md`、`docs/USAGE.md`、`docs/IMPLEMENTATION.md`、`docs/interview-roadmap.md`。
+
+已验证：
+
+```bash
+./mvnw -pl gateway-service -am test
+./mvnw -pl gateway-service -am -Pintegration-test verify
+./mvnw test
+./mvnw -Pintegration-test verify
+./mvnw -Pnacos test
+./mvnw package -DskipTests
+```

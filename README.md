@@ -1,5 +1,7 @@
 # Spring Boot 3 Learning Lab
 
+[![CI](https://github.com/taoking/spring3/actions/workflows/ci.yml/badge.svg)](https://github.com/taoking/spring3/actions/workflows/ci.yml)
+
 这是一个用于长期学习、复盘和面试准备的 Spring Boot 3 示例项目。
 
 项目不接入数据库和 Redis，重点演示 Spring Boot 3 常用组件、注解、配置、测试、监控和错误上报。
@@ -28,6 +30,12 @@
 ./mvnw -pl catalog-service spring-boot:run
 ./mvnw -pl order-service spring-boot:run
 ./mvnw -pl gateway-service spring-boot:run
+```
+
+Docker 可用时，可显式运行 Testcontainers 集成测试：
+
+```bash
+./mvnw -Pintegration-test verify
 ```
 
 默认账号：
@@ -132,6 +140,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - JWT 资源服务器：已补充 `jwt` profile、HS256 本地开发 token、`roles` claim 到 `ROLE_*` 映射、scope 支持和无 token/错 token/权限不足测试；默认 Basic Auth 不变。
 - 自定义 starter / autoconfigure：已新增 `demo-observability-autoconfigure` 和 `demo-observability-spring-boot-starter`，用 `@AutoConfiguration` 自动装配 `@DemoLog` AOP，并覆盖条件装配、属性绑定、禁用开关和用户 Bean 覆盖测试。
 - Resilience4j 深化：已补充 Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 触发参数、fallback 响应和 Prometheus 指标验证。
+- Testcontainers / CI：已新增 GitHub Actions workflow，默认跑 `./mvnw test`，Docker job 跑 `./mvnw -Pintegration-test verify`；Gateway 集成测试使用固定版本 Nginx 容器验证真实下游路由。
 
 ### 后续计划
 
@@ -146,7 +155,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - OAuth2 Resource Server / JWT：已完成 JWT profile、Bearer token 验证、角色映射和测试；后续可补对接真实 IdP、JWK Set 和 client_credentials 服务间 token。
 - 自动配置原理：已完成演示型 observability starter；后续可补源码阅读笔记和更多条件装配案例。
 - Resilience4j 深化：已完成 Retry、RateLimiter、Bulkhead、TimeLimiter、CircuitBreaker 治理矩阵；后续可补更贴近生产的异常分类、舱壁线程池和告警规则。
-- Testcontainers / 集成测试：为 Nacos、Gateway 或外部组件补充可重复集成测试。
+- Testcontainers / 集成测试：已完成 Gateway 下游容器集成测试和 GitHub Actions；后续可扩展到 Nacos 或追踪后端。
 
 #### P1：建议补充
 

@@ -66,6 +66,27 @@
 ./mvnw package -DskipTests
 ```
 
+Docker Desktop 可用时运行 Testcontainers 集成测试：
+
+```bash
+./mvnw -Pintegration-test verify
+```
+
+只运行 Gateway 的容器集成测试：
+
+```bash
+./mvnw -pl gateway-service -am -Pintegration-test verify
+```
+
+`integration-test` Maven profile 使用 Failsafe 执行 `**/*IT.java`，普通 `./mvnw test` 不会启动容器。当前 `GatewayNginxContainerIT` 使用固定镜像 `nginx:1.27.3-alpine` 模拟真实下游服务，验证 Gateway 路由、前缀改写和请求头处理。Docker 不可用时，Testcontainers 测试会通过 `disabledWithoutDocker` 跳过；本地需要先启动 Docker Desktop。
+
+GitHub Actions：
+
+| Job | 命令 | 说明 |
+| --- | --- | --- |
+| `unit-tests` | `./mvnw -B test` | 默认轻量测试，不依赖 Docker |
+| `integration-tests` | `docker info`、`./mvnw -B -Pintegration-test verify` | Docker 可用时运行 Testcontainers 集成测试 |
+
 只测试单个模块：
 
 ```bash

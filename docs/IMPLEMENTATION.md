@@ -19,6 +19,8 @@
 - Zipkin 可以查询一次 `gateway-service -> order-service -> catalog-service` 请求的 trace。
 - `order-service` 和 `catalog-service` 日志可以看到同一个 traceId。
 - 设置 `SENTRY_DSN` 后，调用异常触发接口能在 Sentry 看到事件。
+- `integration-test` profile 可以通过 Testcontainers 验证 Gateway 到容器化下游的真实路由。
+- GitHub Actions 分别执行默认单元测试和 Docker 集成测试。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 项目没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
@@ -53,6 +55,8 @@
 - Trace 传播：Web MVC/WebFlux 入口自动生成或接收 W3C trace context，`order-service` 的 Feign 配置把当前 trace context 注入出站请求。
 - 错误上报：Sentry Jakarta starter，DSN 通过环境变量读取。
 - API 文档：SpringDoc OpenAPI / Swagger UI。
+- 集成测试：`integration-test` Maven profile 使用 Failsafe 运行 `**/*IT.java`，当前通过 Testcontainers 启动固定版本 Nginx 容器验证 Gateway 真实下游。
+- CI：GitHub Actions 使用 JDK 21 和 Maven cache，默认 job 运行 `./mvnw -B test`，Docker job 运行 `./mvnw -B -Pintegration-test verify`。
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
 
 ### 自定义 starter / autoconfigure
@@ -144,6 +148,7 @@ demo:
 
 ```bash
 ./mvnw test
+./mvnw -Pintegration-test verify
 ./mvnw -pl catalog-service spring-boot:run
 ./mvnw -pl order-service spring-boot:run
 ./mvnw -pl gateway-service spring-boot:run
@@ -240,6 +245,8 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `order-service` 增加 Resilience4j 集成测试，覆盖 Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 触发方式，并验证 Prometheus 暴露对应指标。
 - `order-service` 增加 JWT profile 测试，覆盖无 token、错误 token、普通用户 token、管理员 token，并验证服务间调用仍使用 Basic。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
+- `gateway-service` 增加 Testcontainers 集成测试，使用 `nginx:1.27.3-alpine` 作为容器化下游，覆盖真实 Gateway 路由到外部依赖的路径。
+- `.github/workflows/ci.yml` 包含 `unit-tests` 和 `integration-tests` 两个 job，分别覆盖默认测试和 Docker 集成测试。
 - Feign 测试使用 MockWebServer，不依赖公网和手动启动 provider。
 
 ## 明确不做
