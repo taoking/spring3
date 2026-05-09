@@ -20,6 +20,8 @@
 
     <modules>
         <module>common</module>
+        <module>demo-observability-autoconfigure</module>
+        <module>demo-observability-spring-boot-starter</module>
         <module>catalog-service</module>
         <module>order-service</module>
         <module>gateway-service</module>

@@ -21,12 +21,15 @@
 - 设置 `SENTRY_DSN` 后，调用异常触发接口能在 Sentry 看到事件。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 项目没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖。
+- `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
 
 ## 当前实现
 
 ### 工程结构
 
 - `common`：共享 DTO、自定义 AOP 注解。
+- `demo-observability-autoconfigure`：`@DemoLog` 自动配置、属性绑定、默认 reporter、切面 Bean。
+- `demo-observability-spring-boot-starter`：依赖聚合模块，不包含业务代码。
 - `catalog-service`：商品 provider，端口 `8081`。
 - `order-service`：订单 consumer，端口 `8080`。
 - `gateway-service`：Spring Cloud Gateway 统一入口，端口 `8088`。
@@ -43,7 +46,7 @@
 - 韧性：Spring Cloud CircuitBreaker + Resilience4j，Feign fallback，RestClient 统一 fallback 支撑。
 - 网关：Spring Cloud Gateway WebFlux、静态路由、Nacos 服务发现路由、全局过滤器、认证头透传、本地限流、CircuitBreaker fallback。
 - 缓存：Spring Cache + Caffeine。
-- AOP：自定义 `@DemoLog` 和耗时日志切面。
+- AOP：自定义 `@DemoLog`，耗时日志切面由自定义 starter 自动装配。
 - 异步与事件：`@Async`、Spring Event、`@EventListener`。
 - 定时任务：`@Scheduled` 心跳任务。
 - 观测：Actuator、Micrometer、Prometheus registry、自定义 Counter、Micrometer Tracing、Zipkin。
@@ -51,6 +54,38 @@
 - 错误上报：Sentry Jakarta starter，DSN 通过环境变量读取。
 - API 文档：SpringDoc OpenAPI / Swagger UI。
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
+
+### 自定义 starter / autoconfigure
+
+`@DemoLog` 能力已从 `catalog-service` 和 `order-service` 的重复 `LoggingAspect` 迁移到演示型 starter：
+
+- `demo-observability-autoconfigure`：提供 `DemoLogAutoConfiguration`、`DemoLogAspect`、`DemoLogReporter`、`DemoLogProperties`。
+- `demo-observability-spring-boot-starter`：聚合 autoconfigure 和 `spring-boot-starter-aop`，业务服务只依赖 starter。
+- `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`：Spring Boot 3 自动配置注册入口。
+
+自动配置触发条件：
+
+- classpath 存在 `DemoLog`、AspectJ `@Aspect`、`ProceedingJoinPoint`。
+- `demo.observability.demolog.enabled=true` 或未配置。
+- 不存在用户自定义的 `DemoLogReporter` 或 `DemoLogAspect` 时才创建默认 Bean。
+
+配置入口：
+
+```yaml
+demo:
+  observability:
+    demolog:
+      enabled: true
+      slow-threshold: 500ms
+```
+
+测试覆盖：
+
+- 自动配置默认生效。
+- `demo.observability.demolog.enabled=false` 时不创建相关 Bean。
+- 用户自定义 `DemoLogReporter` 时默认 reporter 退让。
+- 用户自定义 `DemoLogAspect` 时默认 aspect 退让。
+- 服务模块引入 starter 后，原 `@DemoLog` 行为保持。
 
 ### HTTP client 模式
 
@@ -186,6 +221,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 
 - `catalog-service` 覆盖 health/prometheus 公开访问、业务认证、商品查询、404 ProblemDetail、admin 权限。
 - `catalog-service` 增加 JWT profile 测试，覆盖无 token、错误 token、普通用户 token、管理员 token，以及 JWT 模式下 Basic 服务凭证仍可用于内部调用。
+- `demo-observability-autoconfigure` 使用 `ApplicationContextRunner` 覆盖自动配置默认生效、关闭配置、用户 Bean 覆盖和 AOP 事件上报。
 - `order-service` 覆盖 health 公开访问、业务认证、参数校验、Feign 正常调用、Feign 失败降级、admin 权限、Prometheus endpoint。
 - `order-service` 增加 W3C `traceparent` 传播测试，验证 Feign 出站请求携带同一个 traceId。
 - `order-service` 增加 RestClient 模式测试，覆盖正常调用、Basic Auth 出站、500 fallback 和读超时 fallback。

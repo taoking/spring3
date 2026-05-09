@@ -36,6 +36,8 @@
 | 文件 | 说明 |
 | --- | --- |
 | `pom.xml` | 父工程、版本、依赖管理 |
+| `demo-observability-autoconfigure/pom.xml` | `@DemoLog` 自动配置、条件装配、配置绑定、默认 Bean |
+| `demo-observability-spring-boot-starter/pom.xml` | starter 依赖聚合，业务服务只需要引入它 |
 | `catalog-service/src/main/resources/application.yml` | 商品服务端口、商品样例、Actuator、Sentry |
 | `order-service/src/main/resources/application.yml` | 订单服务端口、HTTP client 模式、Feign、RestClient、缓存、Resilience4j、Actuator、Sentry |
 | `gateway-service/src/main/resources/application.yml` | 网关端口、静态路由、本地限流、fallback、Actuator |
@@ -77,6 +79,42 @@
 ```bash
 ./mvnw clean
 ```
+
+## 自定义 Starter / Autoconfigure
+
+当前项目提供两个演示模块：
+
+| 模块 | 职责 |
+| --- | --- |
+| `demo-observability-autoconfigure` | 放自动配置代码，包含 `@AutoConfiguration`、`@ConditionalOnClass`、`@ConditionalOnMissingBean`、`@ConfigurationProperties` 和 `AutoConfiguration.imports` |
+| `demo-observability-spring-boot-starter` | 只做依赖聚合，依赖 autoconfigure 模块和 `spring-boot-starter-aop`，不写业务代码 |
+
+`catalog-service` 和 `order-service` 引入 starter 后，`@DemoLog` 注解会自动生效，不再需要各服务复制 `LoggingAspect`。
+
+配置项：
+
+```yaml
+demo:
+  observability:
+    demolog:
+      enabled: true
+      slow-threshold: 500ms
+```
+
+关闭自动配置：
+
+```bash
+java -jar order-service/target/order-service-0.0.1-SNAPSHOT.jar \
+  --demo.observability.demolog.enabled=false
+```
+
+排查自动配置是否生效：
+
+```bash
+./mvnw -pl demo-observability-autoconfigure test
+```
+
+也可以在业务服务启动时加上 `--debug` 查看 Spring Boot condition evaluation report，搜索 `DemoLogAutoConfiguration`。
 
 ## 前台启动服务
 

@@ -7,6 +7,8 @@
 ## 模块
 
 - `common`：共享 DTO、AOP 注解等公共类型。
+- `demo-observability-autoconfigure`：演示型自动配置模块，提供 `@DemoLog` 切面、属性绑定和默认 Bean。
+- `demo-observability-spring-boot-starter`：演示型 starter，只做依赖聚合，供业务服务引入。
 - `catalog-service`：商品服务 provider，默认端口 `8081`。
 - `order-service`：订单服务 consumer，默认端口 `8080`，默认通过 OpenFeign 调用 `catalog-service`，也可切换为 RestClient。
 - `gateway-service`：Spring Cloud Gateway 统一入口，默认端口 `8088`。
@@ -17,7 +19,7 @@
 - Spring Boot 3.5.14
 - Spring Cloud 2025.0.2
 - Maven 多模块 + Maven Wrapper
-- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI
+- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI、自定义 starter / autoconfigure
 
 ## 快速启动
 
@@ -113,7 +115,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Spring Cloud Gateway 路由、过滤器、认证透传、限流、fallback
 - Micrometer Tracing + Zipkin 链路追踪，日志输出 traceId/spanId
 - Caffeine 本地缓存
-- AOP 自定义注解切面
+- AOP 自定义注解切面，已迁移为 Spring Boot 3 自动配置 starter
 - `@Async` 异步任务
 - `@Scheduled` 定时任务
 - Spring Event 事件发布与监听
@@ -128,6 +130,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - 链路追踪：已补充 Micrometer Tracing、Zipkin Docker Compose、日志关联 ID、Feign trace context 传播测试；默认运行路径不强制要求 Zipkin 已启动。
 - HTTP client 选型：已补充 RestClient 调用模式、超时/认证/fallback 复用、测试覆盖和 OpenFeign / RestClient / WebClient / `@HttpExchange` 对比。
 - JWT 资源服务器：已补充 `jwt` profile、HS256 本地开发 token、`roles` claim 到 `ROLE_*` 映射、scope 支持和无 token/错 token/权限不足测试；默认 Basic Auth 不变。
+- 自定义 starter / autoconfigure：已新增 `demo-observability-autoconfigure` 和 `demo-observability-spring-boot-starter`，用 `@AutoConfiguration` 自动装配 `@DemoLog` AOP，并覆盖条件装配、属性绑定、禁用开关和用户 Bean 覆盖测试。
 
 ### 后续计划
 
@@ -140,7 +143,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - 链路追踪深化：已完成 Micrometer Tracing + Zipkin 基线；后续可补 Tempo / OpenTelemetry Collector、采样策略、trace 与日志平台联查。
 - RestClient / `@HttpExchange`：已补充 RestClient 调用模式、统一 fallback、超时配置和选型对比；后续可补 `@HttpExchange` 声明式接口示例。
 - OAuth2 Resource Server / JWT：已完成 JWT profile、Bearer token 验证、角色映射和测试；后续可补对接真实 IdP、JWK Set 和 client_credentials 服务间 token。
-- 自动配置原理：新增 `demo-spring-boot-starter` 或 `demo-autoconfigure` 模块，演示 starter、条件装配和配置绑定。
+- 自动配置原理：已完成演示型 observability starter；后续可补源码阅读笔记和更多条件装配案例。
 - Resilience4j 深化：补充 Retry、RateLimiter、Bulkhead、TimeLimiter，说明不同治理策略边界。
 - Testcontainers / 集成测试：为 Nacos、Gateway 或外部组件补充可重复集成测试。
 

@@ -40,6 +40,26 @@
 - 自定义 Bean 存在时默认 Bean 不覆盖用户配置。
 - 文档能说明自动配置触发条件和排查方式。
 
+## 实施记录
+
+- 已新增 `demo-observability-autoconfigure` 模块，承载 `DemoLogAutoConfiguration`、`DemoLogAspect`、`DemoLogReporter`、`DemoLogProperties`。
+- 已新增 `demo-observability-spring-boot-starter` 模块，只聚合 autoconfigure 和 `spring-boot-starter-aop`。
+- 已通过 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 注册 Spring Boot 3 自动配置。
+- 已使用 `@AutoConfiguration`、`@ConditionalOnClass`、`@ConditionalOnMissingBean`、`@ConditionalOnProperty`、`@ConfigurationProperties`。
+- 已将 `catalog-service` 和 `order-service` 的重复 `LoggingAspect` 删除，改为引入 starter。
+- 已加入 `demo.observability.demolog.enabled` 与 `demo.observability.demolog.slow-threshold` 配置。
+- 已新增 `DemoLogAutoConfigurationTest`，覆盖默认自动配置、禁用配置、用户 reporter 覆盖默认 Bean、用户 aspect 覆盖默认 Bean，并验证 AOP 调用能上报事件。
+- 已更新 `README.md`、`docs/USAGE.md`、`docs/IMPLEMENTATION.md`、`docs/interview-roadmap.md`。
+
+已验证：
+
+```bash
+./mvnw -pl demo-observability-autoconfigure,catalog-service,order-service -am test
+./mvnw test
+./mvnw -Pnacos test
+./mvnw package -DskipTests
+```
+
 ## 不做
 
 - 不发布到远程 Maven 仓库。

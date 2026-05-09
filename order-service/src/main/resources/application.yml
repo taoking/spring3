@@ -29,6 +29,10 @@ spring:
 demo:
   security:
     mode: basic
+  observability:
+    demolog:
+      enabled: true
+      slow-threshold: 500ms
   order:
     currency: CNY
     notification-delay: PT0.1S

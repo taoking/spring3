@@ -16,6 +16,10 @@ spring:
 demo:
   security:
     mode: basic
+  observability:
+    demolog:
+      enabled: true
+      slow-threshold: 500ms
   catalog:
     slow-delay: 2s
     products:
