@@ -37,6 +37,30 @@
 - provider 破坏响应字段时契约测试会失败。
 - 文档说明契约发布或本地 stub 使用方式。
 
+## 实施记录
+
+- `catalog-service` 新增 `contract-test` Maven profile，引入 Spring Cloud Contract Verifier。
+- `catalog-service/src/contract-test/resources/contracts/catalog/` 新增三个 provider 契约：商品查询成功、商品不存在、模拟失败。
+- `CatalogContractBase` 使用 `MockMvc` 作为 provider 生成测试基类，不需要启动真实 HTTP 端口。
+- Spring Cloud Contract Maven Plugin 显式执行 `generateTests`、`convert`、`generateStubs`，生成 provider 验证测试和 `catalog-service-*-stubs.jar`。
+- `order-service` 新增 `contract-test` Maven profile，引入 Stub Runner，并用 `OrderCatalogContractStubTest` 加载本地 stubs 验证 consumer 行为。
+- `order-service` 的契约 consumer 覆盖正常预览、商品不存在 fallback、catalog `500` fallback。
+- 文档已补充运行命令、本地 stubs 使用方式、Spring Cloud Contract 与 MockWebServer 的区别。
+
+## 验证命令
+
+```bash
+./mvnw -Pcontract-test -pl catalog-service -am clean install
+./mvnw -Pcontract-test -pl order-service -am -Dtest=OrderCatalogContractStubTest -Dsurefire.failIfNoSpecifiedTests=false test
+./mvnw test
+```
+
+## 后续可选
+
+- 在 CI 中把 provider 生成的 `stubs` classifier 发布到制品库。
+- Consumer CI 使用固定 provider stubs 版本或版本范围做契约回归。
+- 增加一个有意破坏字段的演示分支，用于面试时说明 provider breaking change 如何被契约测试拦截。
+
 ## 不做
 
 - 不搭建远程契约仓库。

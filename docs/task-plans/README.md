@@ -26,7 +26,7 @@
 | 11 | Sentinel（基线已完成） | [11-sentinel.md](11-sentinel.md) | P1 |
 | 12 | 结构化日志（基线已完成） | [12-structured-logging.md](12-structured-logging.md) | P1 |
 | 13 | API 治理（基线已完成） | [13-api-governance.md](13-api-governance.md) | P1 |
-| 14 | Spring Cloud Contract | [14-contract-testing.md](14-contract-testing.md) | P1 |
+| 14 | Spring Cloud Contract（基线已完成） | [14-contract-testing.md](14-contract-testing.md) | P1 |
 | 15 | 消息队列 | [15-messaging.md](15-messaging.md) | P2 |
 | 16 | Native Image / AOT | [16-native-aot.md](16-native-aot.md) | P2 |
 | 17 | Kubernetes | [17-kubernetes.md](17-kubernetes.md) | P2 |

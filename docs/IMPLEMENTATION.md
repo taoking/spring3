@@ -27,6 +27,7 @@
 - `order-service` 可以通过 `-Psentinel` + `sentinel` profile 启用 Sentinel 本地规则，演示限流、热点参数和慢调用熔断。
 - 三个服务可以通过 `json-logging` profile 输出 JSON 日志，Servlet 服务请求日志包含 requestId、traceId、spanId、status、elapsedMs，并验证敏感认证头不会原样输出。
 - 错误响应包含稳定 `errorCode`、`requestId`、`timestamp`，订单服务同时提供 `/api/v1/orders/preview` 和 `/api/v2/orders/preview` 示例，旧 `/api/orders/preview` 返回废弃提示响应头。
+- `catalog-service` 可以通过 Spring Cloud Contract 生成 provider 验证测试和本地 `stubs` jar，`order-service` 可以使用 Stub Runner 消费 stubs 验证服务间契约。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 项目没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
@@ -72,6 +73,7 @@
 - Sentinel 可选专题：通过 `-Psentinel` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=sentinel` 加载本地 Flow、ParamFlow、Degrade 规则。
 - JSON 日志专题：`json-logging` profile 开启 `logging.structured.format.console=logstash` 和 `demo.observability.http-logging.enabled=true`。
 - API 治理专题：`common` 维护错误码常量，两个 Servlet 服务的 `ProblemDetail` 统一补充 `errorCode`、`requestId`、`timestamp`，订单服务提供 v1/v2 版本路由和旧路径废弃头。
+- 契约测试专题：`contract-test` Maven profile 启用 Spring Cloud Contract Verifier / Stub Runner，`catalog-service` 维护 provider 契约并生成 `stubs` classifier，`order-service` 使用本地 stubs 验证 consumer fallback 行为。
 
 ### 自定义 starter / autoconfigure
 
@@ -185,11 +187,35 @@ demo:
 
 本项目为了保留服务间调用示例，在 JWT 模式下仍保留 Basic Auth。`order-service` 调用 `catalog-service` 继续使用现有 Basic 凭证；生产实现可以改为 OAuth2 `client_credentials` service token 或由网关/服务网格处理内部身份。
 
+### Spring Cloud Contract 契约测试
+
+契约测试通过独立 `contract-test` Maven profile 隔离，不影响默认构建路径。
+
+Provider 侧：
+
+- `catalog-service/src/contract-test/resources/contracts/catalog/*.groovy` 定义 HTTP 契约。
+- `CatalogContractBase` 使用 `@SpringBootTest` + `@AutoConfigureMockMvc` 提供生成测试的基类。
+- Spring Cloud Contract Maven Plugin 执行 `generateTests`、`convert`、`generateStubs`，并关闭增量生成，保证重复运行也会稳定生成测试源和 stubs。
+
+Consumer 侧：
+
+- `OrderCatalogContractStubTest` 使用 `@AutoConfigureStubRunner` 加载 `com.taoking.spring3:catalog-service:+:stubs:18081`。
+- 测试覆盖 `SKU-1001` 正常响应、`UNKNOWN` 的 `404 ProblemDetail`、`fail=true` 的 `500 ProblemDetail`。
+- Consumer 不依赖真实 `catalog-service` 进程，只依赖 provider 生成并安装到本地 Maven 仓库的 stubs jar。
+
+和现有 MockWebServer 测试的边界：
+
+- MockWebServer 继续用于验证 Feign/RestClient 的请求头、超时和 fallback 细节。
+- Spring Cloud Contract 用于把 provider 的 HTTP 响应结构固化为契约，防止 provider 改坏字段后 consumer 测试仍然使用过期手写 mock。
+
 ## 运行方式
 
 ```bash
 ./mvnw test
 ./mvnw -Pintegration-test verify
+./mvnw -Pcontract-test -pl catalog-service -am test
+./mvnw -Pcontract-test -pl catalog-service -am install
+./mvnw -Pcontract-test -pl order-service -am -Dtest=OrderCatalogContractStubTest -Dsurefire.failIfNoSpecifiedTests=false test
 ./mvnw package -DskipTests
 docker compose -f deployment/docker-compose.yml up -d
 ./mvnw -pl catalog-service spring-boot:run
@@ -288,6 +314,8 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `order-service` 增加 Resilience4j 集成测试，覆盖 Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 触发方式，并验证 Prometheus 暴露对应指标。
 - `order-service` 增加 JWT profile 测试，覆盖无 token、错误 token、普通用户 token、管理员 token，并验证服务间调用仍使用 Basic。
 - `order-service` 增加 `OrderJsonLoggingProfileTest`，覆盖 `json-logging` profile 输出合法 JSON、生成 `X-Request-Id`、请求日志字段和 `Authorization`/password 脱敏。
+- `order-service` 增加 `OrderCatalogContractStubTest`，在 `contract-test` profile 下使用 provider 生成的 stubs 验证正常响应、商品不存在和 catalog 模拟失败 fallback。
+- `catalog-service` 增加 Spring Cloud Contract provider 测试，覆盖商品查询成功、`404 ProblemDetail` 和 `500 ProblemDetail` 的响应结构。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - `gateway-service` 增加 Testcontainers 集成测试，使用 `nginx:1.27.3-alpine` 作为容器化下游，覆盖真实 Gateway 路由到外部依赖的路径。
 - `.github/workflows/ci.yml` 包含 `unit-tests` 和 `integration-tests` 两个 job，分别覆盖默认测试和 Docker 集成测试。

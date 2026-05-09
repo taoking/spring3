@@ -25,7 +25,7 @@
 | P1 | Java 21 与虚拟线程 | Spring Boot 3 常被追问 Java 17/21 升级收益 | 已完成 `virtual-thread` profile、请求线程和 `@Async` 线程观察接口；后续可补 pinned thread 诊断 |
 | P1 | 结构化日志 | JSON log、MDC、traceId、错误码、日志脱敏是线上排障基本功 | 已完成 `json-logging` profile、请求日志过滤器、requestId 响应头、敏感头脱敏测试；后续补日志平台查询样例 |
 | P1 | API 治理 | API versioning、统一错误码、OpenAPI 分组、接口兼容性体现长期维护能力 | 已完成 ProblemDetail 错误码、订单 v1/v2、旧接口废弃头、OpenAPI 分组和测试 |
-| P1 | Spring Cloud Contract | 微服务 provider/consumer 变更风险控制 | 后续在 order/catalog 间补契约测试 |
+| P1 | Spring Cloud Contract | 微服务 provider/consumer 变更风险控制 | 已完成 catalog provider 契约、stubs jar、本地 Stub Runner consumer 测试，覆盖成功、404、500 三类响应 |
 | P2 | 消息队列 | Kafka/RabbitMQ/RocketMQ 的投递语义、幂等、重试、顺序消息 | 只保留路线，不引入运行依赖 |
 | P2 | Testcontainers | 集成测试、外部依赖隔离、CI 可重复性 | 已完成 Gateway 下游容器集成测试和 GitHub Actions；后续可扩展到 Nacos |
 | P2 | Native Image/AOT | Spring Boot 3 亮点之一，适合了解限制和收益 | 后续可加文档，不必默认构建 |
@@ -45,6 +45,7 @@
 - 能说明 traceId/spanId、日志、指标、链路追踪如何一起用于排障。
 - 能说明结构化日志字段设计、MDC、requestId、traceId/spanId 和敏感字段脱敏策略。
 - 能说明错误码稳定性、API 版本兼容、废弃接口 Sunset 策略和 OpenAPI 分组方式。
+- 能说明 Spring Cloud Contract 和 MockWebServer 的区别，以及 provider stubs 如何被 consumer CI 使用。
 - 能说明服务注册和配置中心在故障场景下的降级策略。
 - 能说明 Gateway 在认证、鉴权、路由、限流、跨域、灰度上的职责边界。
 - 能说明 JWT/OAuth2 Resource Server 的认证与授权流程，以及和 session 登录的差异。

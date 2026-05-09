@@ -1210,6 +1210,71 @@ open http://localhost:8081/swagger-ui.html
 ./mvnw -pl catalog-service,order-service -am -Dtest=CatalogControllerTest,OrderControllerTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
+## Spring Cloud Contract
+
+当前项目把 Spring Cloud Contract 作为独立 `contract-test` Maven profile，不进入默认 `./mvnw test`，避免日常测试额外生成代码和本地 stub 制品。
+
+覆盖范围：
+
+| 角色 | 模块 | 内容 |
+| --- | --- | --- |
+| Provider | `catalog-service` | `GET /api/catalog/products/{sku}` 契约，覆盖成功、商品不存在、模拟失败 |
+| Consumer | `order-service` | 使用 Stub Runner 从本地 Maven 仓库加载 `catalog-service` 的 `stubs` jar，验证订单预览能处理正常响应和下游错误 fallback |
+
+Provider 契约文件：
+
+```text
+catalog-service/src/contract-test/resources/contracts/catalog/
+```
+
+Provider 基类：
+
+```text
+catalog-service/src/contract-test/java/com/taoking/spring3/catalog/contract/CatalogContractBase.java
+```
+
+单独运行 provider 契约测试：
+
+```bash
+./mvnw -Pcontract-test -pl catalog-service -am test
+```
+
+生成并安装本地 stubs jar：
+
+```bash
+./mvnw -Pcontract-test -pl catalog-service -am install
+```
+
+生成物会安装到本机 Maven 仓库：
+
+```text
+~/.m2/repository/com/taoking/spring3/catalog-service/0.0.1-SNAPSHOT/catalog-service-0.0.1-SNAPSHOT-stubs.jar
+```
+
+运行 consumer 契约测试：
+
+```bash
+./mvnw -Pcontract-test -pl order-service -am -Dtest=OrderCatalogContractStubTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+完整本地契约验证流程：
+
+```bash
+./mvnw -Pcontract-test -pl catalog-service -am clean install
+./mvnw -Pcontract-test -pl order-service -am -Dtest=OrderCatalogContractStubTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+Spring Cloud Contract 与 MockWebServer 的区别：
+
+| 对比项 | Spring Cloud Contract | MockWebServer |
+| --- | --- | --- |
+| 关注点 | provider 和 consumer 共享 HTTP 契约，provider 破坏响应字段时测试失败 | consumer 测试内手写 mock 响应，主要验证客户端逻辑 |
+| 维护方式 | 契约由 provider 维护并生成 stubs，consumer 使用同一份 stubs | 每个 consumer 测试各自维护 mock 响应 |
+| 适用场景 | 多服务协作、接口兼容性、防止 provider breaking change | 单服务内快速验证超时、fallback、请求头、序列化 |
+| 当前项目定位 | 验证 `catalog-service` 的 API 契约和 `order-service` 对契约响应的处理 | 保留在 Feign/RestClient 测试中验证 client 细节 |
+
+当前没有搭建远程契约仓库。后续如果接入企业制品库，可以让 provider 在 CI 中发布 `stubs` classifier，consumer CI 再以固定版本或版本范围拉取 stubs 做契约回归。
+
 ## Nacos
 
 Nacos 是可选专题，默认 profile 不依赖 Nacos。只有同时使用 Maven `-Pnacos` 和 Spring `SPRING_PROFILES_ACTIVE=nacos` 时才启用 Nacos。

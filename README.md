@@ -21,7 +21,7 @@
 - Spring Boot 3.5.14
 - Spring Cloud 2025.0.2
 - Maven 多模块 + Maven Wrapper
-- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI、自定义 starter / autoconfigure
+- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI、Spring Cloud Contract、自定义 starter / autoconfigure
 
 ## 快速启动
 
@@ -130,6 +130,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Actuator、Micrometer、Prometheus、Grafana
 - Sentry 异常上报
 - SpringDoc OpenAPI / Swagger UI
+- Spring Cloud Contract provider/consumer 契约测试
 
 ### 已补充的可选专题
 
@@ -146,6 +147,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Sentinel：已新增独立 `sentinel` Maven/Spring profile、本地内存规则、QPS 限流、热点参数、慢调用熔断探针和 profile 回归测试；默认 profile 不引入 Sentinel 依赖。
 - 结构化日志：已新增 `json-logging` profile，使用 Spring Boot 3.5 内建 structured logging 输出 JSON，并补充 requestId、traceId、spanId、status、elapsedMs 和敏感头脱敏测试。
 - API 治理：已补充 ProblemDetail 稳定错误码、requestId、timestamp、订单 v1/v2 示例、旧接口废弃头和 OpenAPI 分组。
+- Spring Cloud Contract：已补充 `catalog-service` provider 契约、生成 stubs jar、`order-service` consumer Stub Runner 测试，覆盖成功、商品不存在和模拟失败三类下游响应。
 
 ### 后续计划
 
@@ -169,7 +171,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Sentinel：已完成可选 `sentinel` profile、QPS 限流、热点参数、慢调用熔断探针和 Resilience4j 对比；后续可补 Dashboard/Nacos 动态规则和集群限流。
 - 结构化日志：已完成 `json-logging` profile、Servlet 请求日志过滤器、Gateway 结构化审计字段和敏感头脱敏；后续可补 Loki/ELK 查询样例和统一错误码字段。
 - API 治理：已完成稳定错误码、版本路由、废弃响应头、OpenAPI 分组和兼容策略说明；后续可补接口变更 changelog 模板。
-- Spring Cloud Contract：补充服务间契约测试，降低 provider/consumer 变更风险。
+- Spring Cloud Contract：已完成 catalog/order 契约测试基线；后续可补契约发布到制品库、CI consumer matrix 和 breaking change 演示。
 
 #### P2：路线保留
 
