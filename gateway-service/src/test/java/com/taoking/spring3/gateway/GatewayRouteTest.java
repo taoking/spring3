@@ -48,8 +48,8 @@ class GatewayRouteTest {
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
-        registry.add("demo.gateway.routes.catalog-uri", () -> catalogServer.url("/").toString().replaceAll("/$", ""));
-        registry.add("demo.gateway.routes.order-uri", () -> orderServer.url("/").toString().replaceAll("/$", ""));
+        registry.add("demo.gateway.routes.catalog-uri", () -> backendUrl(catalogServer));
+        registry.add("demo.gateway.routes.order-uri", () -> backendUrl(orderServer));
     }
 
     @Test
@@ -134,5 +134,9 @@ class GatewayRouteTest {
         return new MockResponse()
                 .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .setBody(body);
+    }
+
+    private static String backendUrl(MockWebServer server) {
+        return server.url("/").toString().replace("localhost", "127.0.0.1").replaceAll("/$", "");
     }
 }

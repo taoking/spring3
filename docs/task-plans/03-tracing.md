@@ -4,6 +4,16 @@
 
 在现有 Prometheus/Grafana 指标基础上补齐 tracing，让一次 `order-service -> catalog-service` 调用可以在 trace 系统中串起来，并在日志中看到 traceId/spanId。
 
+## 当前状态
+
+已完成基线实现：
+
+- 选型：Micrometer Tracing + OpenTelemetry bridge + Zipkin exporter。
+- 本地后端：`observability/docker-compose.yml` 新增 `openzipkin/zipkin`。
+- 三个服务日志输出 `[application,traceId,spanId]`。
+- `order-service` 的 Feign 配置会把当前 trace context 注入出站请求。
+- `OrderControllerTest` 已覆盖固定 W3C `traceparent` 传播到 `catalog-service` client 请求。
+
 ## 任务 Prompt
 
 ```text
@@ -39,8 +49,45 @@
 - order/catalog 日志中能看到相同 traceId。
 - Prometheus 原有 targets 仍为 `up`。
 
+## 验收命令
+
+```bash
+./mvnw test
+./mvnw -Pnacos test
+docker compose -f observability/docker-compose.yml up -d
+curl -fsS http://localhost:9411/health
+
+TRACE_ID=4bf92f3577b34da6a3ce929d0e0e4736
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -H "traceparent: 00-${TRACE_ID}-00f067aa0ba902b7-01" \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8088/orders/api/orders/preview
+
+sleep 5
+curl -fsS "http://localhost:9411/api/v2/trace/${TRACE_ID}"
+rg "$TRACE_ID" gateway-service/target/run.log order-service/target/run.log catalog-service/target/run.log
+curl -fsS 'http://localhost:9090/api/v1/query?query=up'
+```
+
+## 验收记录
+
+- `./mvnw test`：通过。
+- `./mvnw -Pnacos test`：通过。
+- `docker compose -f observability/docker-compose.yml up -d`：Prometheus、Grafana、Zipkin 均可启动。
+- `curl -fsS http://localhost:9411/health`：返回 `UP`。
+- 使用固定 traceId `22222222222222222222222222222222` 通过 gateway 发起订单预览请求后，Zipkin trace 包含 `gateway-service`、`order-service`、`catalog-service`。
+- `gateway-service/target/run.log`、`order-service/target/run.log`、`catalog-service/target/run.log` 均能检索到同一个 traceId。
+- Prometheus `up` 查询中 `gateway-service`、`order-service`、`catalog-service` 均为 `1`。
+
 ## 不做
 
 - 不接入外部 SaaS APM。
 - 不采集敏感请求体。
 - 不要求生产级采样策略。
+
+## 参考资料
+
+- Spring Boot 3.5 Tracing：`https://docs.spring.io/spring-boot/3.5/reference/actuator/tracing.html`
+- Spring Boot 3.5 Common Application Properties：`https://docs.spring.io/spring-boot/3.5/appendix/application-properties/index.html`
+- Zipkin Quickstart：`https://zipkin.io/pages/quickstart.html`

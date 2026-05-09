@@ -14,6 +14,8 @@
 - 未登录访问业务接口返回 `401`，普通用户访问 admin 接口返回 `403`。
 - Prometheus 可以抓取三个服务的 `/actuator/prometheus`。
 - Grafana 可以看到 JVM、HTTP 请求和自定义业务指标。
+- Zipkin 可以查询一次 `gateway-service -> order-service -> catalog-service` 请求的 trace。
+- `order-service` 和 `catalog-service` 日志可以看到同一个 traceId。
 - 设置 `SENTRY_DSN` 后，调用异常触发接口能在 Sentry 看到事件。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 项目没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖。
@@ -41,7 +43,8 @@
 - AOP：自定义 `@DemoLog` 和耗时日志切面。
 - 异步与事件：`@Async`、Spring Event、`@EventListener`。
 - 定时任务：`@Scheduled` 心跳任务。
-- 观测：Actuator、Micrometer、Prometheus registry、自定义 Counter。
+- 观测：Actuator、Micrometer、Prometheus registry、自定义 Counter、Micrometer Tracing、Zipkin。
+- Trace 传播：Web MVC/WebFlux 入口自动生成或接收 W3C trace context，`order-service` 的 Feign 配置把当前 trace context 注入出站请求。
 - 错误上报：Sentry Jakarta starter，DSN 通过环境变量读取。
 - API 文档：SpringDoc OpenAPI / Swagger UI。
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
@@ -84,9 +87,9 @@ curl -u admin:admin123 -X POST http://localhost:8080/api/orders/admin/sentry-err
 
 没有设置 `SENTRY_DSN` 时，SDK 不会上报真实事件，应用仍然可以正常启动。
 
-## Prometheus + Grafana 验证
+## Prometheus + Grafana + Zipkin 验证
 
-先启动两个 Spring Boot 服务，再启动观测栈：
+先启动三个 Spring Boot 服务，再启动观测栈：
 
 ```bash
 docker compose -f observability/docker-compose.yml up
@@ -96,8 +99,25 @@ docker compose -f observability/docker-compose.yml up
 
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000`
+- Zipkin: `http://localhost:9411/zipkin`
 
-Prometheus 使用 `host.docker.internal` 抓取宿主机上的两个 Spring Boot 服务。
+Prometheus 使用 `host.docker.internal` 抓取宿主机上的三个 Spring Boot 服务。Zipkin 通过 `http://localhost:9411/api/v2/spans` 接收三个服务上报的 span。
+
+链路追踪验证：
+
+```bash
+TRACE_ID=4bf92f3577b34da6a3ce929d0e0e4736
+
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -H "traceparent: 00-${TRACE_ID}-00f067aa0ba902b7-01" \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8088/orders/api/orders/preview
+
+sleep 5
+curl -fsS "http://localhost:9411/api/v2/trace/${TRACE_ID}"
+rg "$TRACE_ID" gateway-service/target/run.log order-service/target/run.log catalog-service/target/run.log
+```
 
 ## Nacos 可选专题
 
@@ -122,6 +142,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 
 - `catalog-service` 覆盖 health/prometheus 公开访问、业务认证、商品查询、404 ProblemDetail、admin 权限。
 - `order-service` 覆盖 health 公开访问、业务认证、参数校验、Feign 正常调用、Feign 失败降级、admin 权限、Prometheus endpoint。
+- `order-service` 增加 W3C `traceparent` 传播测试，验证 Feign 出站请求携带同一个 traceId。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - Feign 测试使用 MockWebServer，不依赖公网和手动启动 provider。
 
@@ -131,5 +152,6 @@ docker compose -f platform/nacos/docker-compose.yml config
 - 不接入 Redis 或 Spring Session Redis。
 - 不实现 Kafka、RabbitMQ、RocketMQ 代码。
 - 不把 Nacos 作为默认 profile 的必需依赖。
+- 不把 Zipkin 作为业务服务启动的硬依赖。
 - 不提交真实 Sentry DSN。
-- 不做前端页面，只使用 REST API、Swagger UI、Prometheus 和 Grafana。
+- 不做前端页面，只使用 REST API、Swagger UI、Prometheus、Grafana 和 Zipkin。

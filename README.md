@@ -17,7 +17,7 @@
 - Spring Boot 3.5.14
 - Spring Cloud 2025.0.2
 - Maven 多模块 + Maven Wrapper
-- Spring Web MVC、WebFlux Gateway、Validation、Security、OpenFeign、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Sentry、SpringDoc OpenAPI
+- Spring Web MVC、WebFlux Gateway、Validation、Security、OpenFeign、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI
 
 ## 快速启动
 
@@ -43,6 +43,7 @@
 - Catalog health: `http://localhost:8081/actuator/health`
 - Order Prometheus metrics: `http://localhost:8080/actuator/prometheus`
 - Catalog Prometheus metrics: `http://localhost:8081/actuator/prometheus`
+- Zipkin UI: `http://localhost:9411/zipkin`
 
 ## 示例调用
 
@@ -81,7 +82,7 @@ curl -u admin:admin123 -X POST http://localhost:8080/api/orders/admin/sentry-err
 
 没有设置 `SENTRY_DSN` 时，应用仍可正常启动，但不会真实上报事件。
 
-## Prometheus + Grafana
+## Prometheus + Grafana + Zipkin
 
 当前仓库提供 Docker Compose 配置：
 
@@ -89,13 +90,14 @@ curl -u admin:admin123 -X POST http://localhost:8080/api/orders/admin/sentry-err
 docker compose -f observability/docker-compose.yml up
 ```
 
-启动两个 Spring Boot 服务后访问：
+启动三个 Spring Boot 服务后访问：
 
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000`
+- Zipkin: `http://localhost:9411/zipkin`
 - Grafana 默认账号：`admin / admin`
 
-Prometheus 在 Docker 中通过 `host.docker.internal:8080` 和 `host.docker.internal:8081` 抓取本机服务。
+Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.internal:8081` 和 `host.docker.internal:8088` 抓取本机服务。Zipkin 接收三个服务上报的 trace，日志格式包含 `application/traceId/spanId`。
 
 ## 学习路线
 
@@ -108,6 +110,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080` 和 `host.docker.int
 - OpenFeign 服务间调用
 - Resilience4j 熔断降级
 - Spring Cloud Gateway 路由、过滤器、认证透传、限流、fallback
+- Micrometer Tracing + Zipkin 链路追踪，日志输出 traceId/spanId
 - Caffeine 本地缓存
 - AOP 自定义注解切面
 - `@Async` 异步任务
@@ -121,6 +124,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080` 和 `host.docker.int
 
 - Nacos 注册中心/配置中心：已补充本地 Docker Compose、版本基线、可选 Maven profile、`application-nacos.yml`、服务注册发现、配置中心接入和面试重点；默认运行路径不依赖 Nacos。
 - Gateway 服务发现路由：`gateway-service` 默认使用 localhost 静态路由，`nacos` profile 下切换为 `lb://catalog-service` 和 `lb://order-service`。
+- 链路追踪：已补充 Micrometer Tracing、Zipkin Docker Compose、日志关联 ID、Feign trace context 传播测试；默认运行路径不强制要求 Zipkin 已启动。
 
 ### 后续计划
 
@@ -130,7 +134,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080` 和 `host.docker.int
 
 - Nacos 深化：已完成 `nacos` profile、服务注册发现、启动期配置中心读取；后续补动态刷新、namespace/group 多环境隔离和 Testcontainers 集成测试。
 - Spring Cloud Gateway 深化：已完成 `gateway-service`、静态/Nacos 路由、过滤器、鉴权透传、限流和 fallback；后续可补灰度路由、跨域和更贴近生产的分布式限流。
-- 链路追踪：补充 Micrometer Tracing + OpenTelemetry/Zipkin/Tempo，并在日志中输出 traceId/spanId。
+- 链路追踪深化：已完成 Micrometer Tracing + Zipkin 基线；后续可补 Tempo / OpenTelemetry Collector、采样策略、trace 与日志平台联查。
 - RestClient / `@HttpExchange`：补充 Spring 原生 HTTP client 示例，用于和 OpenFeign 做选型对比。
 - OAuth2 Resource Server / JWT：在 Basic Auth 之外补充 JWT 资源服务器示例，提升 Security 面试覆盖面。
 - 自动配置原理：新增 `demo-spring-boot-starter` 或 `demo-autoconfigure` 模块，演示 starter、条件装配和配置绑定。

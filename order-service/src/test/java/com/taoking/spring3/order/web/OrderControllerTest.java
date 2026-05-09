@@ -5,11 +5,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.taoking.spring3.common.dto.OrderPreviewRequest;
 import com.taoking.spring3.common.dto.OrderPreviewResponse;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -24,8 +27,11 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "demo.order.heartbeat-delay=PT1H"
+        "demo.order.heartbeat-delay=PT1H",
+        "management.tracing.sampling.probability=1.0",
+        "management.zipkin.tracing.export.enabled=false"
 })
+@AutoConfigureObservability
 class OrderControllerTest {
 
     private static MockWebServer catalogServer;
@@ -89,7 +95,33 @@ class OrderControllerTest {
         assertThat(response.getBody().product().sku()).isEqualTo("SKU-1001");
         assertThat(response.getBody().quantity()).isEqualTo(2);
         assertThat(response.getBody().fallbackUsed()).isFalse();
-        assertThat(catalogServer.takeRequest().getPath()).isEqualTo("/api/catalog/products/SKU-1001?slow=false&fail=false");
+        RecordedRequest catalogRequest = catalogServer.takeRequest(1, TimeUnit.SECONDS);
+        assertThat(catalogRequest).isNotNull();
+        assertThat(catalogRequest.getPath()).isEqualTo("/api/catalog/products/SKU-1001?slow=false&fail=false");
+    }
+
+    @Test
+    void previewPropagatesW3cTraceContextToCatalogClient() throws Exception {
+        catalogServer.enqueue(jsonResponse("""
+                {"id":2,"sku":"SKU-1002","name":"Observability Workbook","price":129.00,"active":true,"fallback":false}
+                """));
+        String traceId = "4bf92f3577b34da6a3ce929d0e0e4736";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBasicAuth("user", "user123");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("traceparent", "00-" + traceId + "-00f067aa0ba902b7-01");
+
+        ResponseEntity<OrderPreviewResponse> response = restTemplate.exchange(
+                url("/api/orders/preview"),
+                HttpMethod.POST,
+                new HttpEntity<>(new OrderPreviewRequest("SKU-1002", 2), headers),
+                OrderPreviewResponse.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        RecordedRequest catalogRequest = catalogServer.takeRequest(1, TimeUnit.SECONDS);
+        assertThat(catalogRequest).isNotNull();
+        assertThat(catalogRequest.getHeader("traceparent")).contains(traceId);
     }
 
     @Test

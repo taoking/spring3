@@ -19,6 +19,7 @@
 | Gateway Service | `localhost:8088` |
 | Prometheus | `localhost:9090` |
 | Grafana | `localhost:3000` |
+| Zipkin | `localhost:9411` |
 | Nacos 控制台 | `localhost:8847` |
 | Nacos 客户端 API | `localhost:8848` |
 
@@ -39,7 +40,7 @@
 | `order-service/src/main/resources/application.yml` | 订单服务端口、Feign、缓存、Resilience4j、Actuator、Sentry |
 | `gateway-service/src/main/resources/application.yml` | 网关端口、静态路由、本地限流、fallback、Actuator |
 | `gateway-service/src/main/resources/application-nacos.yml` | 网关 Nacos 服务发现路由 |
-| `observability/docker-compose.yml` | Prometheus + Grafana |
+| `observability/docker-compose.yml` | Prometheus + Grafana + Zipkin |
 | `observability/prometheus/prometheus.yml` | Prometheus 抓取目标 |
 | `platform/nacos/docker-compose.yml` | 本地 Nacos 3.0.3 |
 
@@ -50,6 +51,9 @@
 | `SENTRY_DSN` | Sentry DSN，未设置时不真实上报 | 空 |
 | `APP_ENV` | Sentry environment | `local` |
 | `SPRING_PROFILES_ACTIVE` | Spring profile | 默认 profile |
+| `TRACING_SAMPLING_PROBABILITY` | trace 采样率，学习环境默认全采样 | `1.0` |
+| `ZIPKIN_TRACING_ENABLED` | 是否向 Zipkin 上报 trace | `true` |
+| `ZIPKIN_ENDPOINT` | Zipkin span 上报地址 | `http://localhost:9411/api/v2/spans` |
 
 ## 构建与测试
 
@@ -253,7 +257,7 @@ demo:
       window: 1m
 ```
 
-## Prometheus + Grafana
+## Prometheus + Grafana + Zipkin
 
 启动观测栈：
 
@@ -267,6 +271,7 @@ docker compose -f observability/docker-compose.yml up -d
 docker compose -f observability/docker-compose.yml ps
 curl -fsS http://localhost:9090/-/ready
 curl -fsS http://localhost:3000/api/health
+curl -fsS http://localhost:9411/health
 ```
 
 查看 Prometheus 抓取目标：
@@ -301,6 +306,7 @@ curl -fsS 'http://localhost:9090/api/v1/query?query=catalog_product_simulated_fa
 ```bash
 docker compose -f observability/docker-compose.yml logs -f prometheus
 docker compose -f observability/docker-compose.yml logs -f grafana
+docker compose -f observability/docker-compose.yml logs -f zipkin
 ```
 
 停止观测栈：
@@ -313,6 +319,59 @@ docker compose -f observability/docker-compose.yml down
 
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000`
+- Zipkin UI: `http://localhost:9411/zipkin`
+
+## Micrometer Tracing + Zipkin
+
+三个服务默认启用 Micrometer Tracing，采样率为 `1.0`，日志相关 ID 格式为 `[application,traceId,spanId]`。Zipkin 没启动时服务仍可启动；不需要 trace 上报时可以设置：
+
+```bash
+export ZIPKIN_TRACING_ENABLED=false
+```
+
+启动完整链路：
+
+```bash
+docker compose -f observability/docker-compose.yml up -d
+./mvnw package -DskipTests
+
+screen -dmS spring3-catalog zsh -lc 'java -jar catalog-service/target/catalog-service-0.0.1-SNAPSHOT.jar > catalog-service/target/run.log 2>&1'
+screen -dmS spring3-order zsh -lc 'java -jar order-service/target/order-service-0.0.1-SNAPSHOT.jar > order-service/target/run.log 2>&1'
+screen -dmS spring3-gateway zsh -lc 'java -jar gateway-service/target/gateway-service-0.0.1-SNAPSHOT.jar > gateway-service/target/run.log 2>&1'
+```
+
+发起带固定 W3C traceId 的订单预览请求：
+
+```bash
+TRACE_ID=4bf92f3577b34da6a3ce929d0e0e4736
+
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -H "traceparent: 00-${TRACE_ID}-00f067aa0ba902b7-01" \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8088/orders/api/orders/preview
+
+sleep 5
+```
+
+查询 Zipkin trace：
+
+```bash
+curl -fsS "http://localhost:9411/api/v2/trace/${TRACE_ID}" \
+  | jq -r '.[] | [.traceId, .name, (.localEndpoint.serviceName // "-"), (.remoteEndpoint.serviceName // "-")] | @tsv'
+```
+
+检查日志中的同一个 traceId：
+
+```bash
+rg "$TRACE_ID" gateway-service/target/run.log order-service/target/run.log catalog-service/target/run.log
+```
+
+核心代码位置：
+
+- `catalog-service/pom.xml`、`order-service/pom.xml`、`gateway-service/pom.xml`：Micrometer Tracing + Zipkin exporter 依赖。
+- `order-service/src/main/java/com/taoking/spring3/order/config/FeignConfig.java`：Feign 出站请求注入当前 trace context。
+- `order-service/src/test/java/com/taoking/spring3/order/web/OrderControllerTest.java`：验证 `traceparent` 传播到 catalog client。
 
 ## Nacos
 
@@ -459,6 +518,7 @@ lsof -nP -iTCP:8081 -sTCP:LISTEN
 lsof -nP -iTCP:8088 -sTCP:LISTEN
 lsof -nP -iTCP:9090 -sTCP:LISTEN
 lsof -nP -iTCP:3000 -sTCP:LISTEN
+lsof -nP -iTCP:9411 -sTCP:LISTEN
 lsof -nP -iTCP:8848 -sTCP:LISTEN
 ```
 

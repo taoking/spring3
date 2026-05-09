@@ -48,6 +48,16 @@ management:
     metrics:
       export:
         enabled: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+    propagation:
+      produce:
+        - w3c
+      consume:
+        - w3c
+        - b3
+        - b3_multi
   endpoints:
     web:
       exposure:
@@ -65,6 +75,11 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+  zipkin:
+    tracing:
+      export:
+        enabled: ${ZIPKIN_TRACING_ENABLED:true}
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
 
 info:
   app:
@@ -72,5 +87,8 @@ info:
     description: API gateway for the Spring Boot 3 learning lab
 
 logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-}] "
+  include-application-name: false
   level:
     com.taoking.spring3.gateway: INFO

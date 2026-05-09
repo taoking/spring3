@@ -43,8 +43,8 @@ class GatewayRateLimitTest {
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
-        registry.add("demo.gateway.routes.catalog-uri", () -> catalogServer.url("/").toString().replaceAll("/$", ""));
-        registry.add("demo.gateway.routes.order-uri", () -> catalogServer.url("/").toString().replaceAll("/$", ""));
+        registry.add("demo.gateway.routes.catalog-uri", () -> backendUrl(catalogServer));
+        registry.add("demo.gateway.routes.order-uri", () -> backendUrl(catalogServer));
     }
 
     @Test
@@ -75,5 +75,9 @@ class GatewayRateLimitTest {
                 .jsonPath("$.title").isEqualTo("Gateway rate limit exceeded");
 
         assertThat(catalogServer.getRequestCount()).isEqualTo(1);
+    }
+
+    private static String backendUrl(MockWebServer server) {
+        return server.url("/").toString().replace("localhost", "127.0.0.1").replaceAll("/$", "");
     }
 }

@@ -3,8 +3,11 @@ package com.taoking.spring3.gateway.filter;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.route.Route;
@@ -24,10 +27,17 @@ class RequestAuditGlobalFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(RequestAuditGlobalFilter.class);
 
+    private final Tracer tracer;
+
+    RequestAuditGlobalFilter(ObjectProvider<Tracer> tracerProvider) {
+        this.tracer = tracerProvider.getIfAvailable();
+    }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         Instant startedAt = Instant.now();
         String requestId = resolveRequestId(exchange);
+        TraceIds traceIds = resolveTraceIds(exchange);
         ServerHttpRequest request = exchange.getRequest()
                 .mutate()
                 .headers(headers -> headers.set(REQUEST_ID_HEADER, requestId))
@@ -41,8 +51,10 @@ class RequestAuditGlobalFilter implements GlobalFilter, Ordered {
                     Route route = mutatedExchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
                     HttpStatusCode status = mutatedExchange.getResponse().getStatusCode();
                     log.info(
-                            "gateway requestId={} routeId={} status={} elapsedMs={}",
+                            "gateway requestId={} traceId={} spanId={} routeId={} status={} elapsedMs={}",
                             requestId,
+                            traceIds.traceId(),
+                            traceIds.spanId(),
                             route == null ? "unmatched" : route.getId(),
                             status == null ? "NA" : status.value(),
                             elapsedMs
@@ -58,5 +70,27 @@ class RequestAuditGlobalFilter implements GlobalFilter, Ordered {
     private String resolveRequestId(ServerWebExchange exchange) {
         String incoming = exchange.getRequest().getHeaders().getFirst(REQUEST_ID_HEADER);
         return StringUtils.hasText(incoming) ? incoming : UUID.randomUUID().toString();
+    }
+
+    private TraceIds resolveTraceIds(ServerWebExchange exchange) {
+        Span currentSpan = tracer == null ? null : tracer.currentSpan();
+        if (currentSpan != null) {
+            return new TraceIds(currentSpan.context().traceId(), currentSpan.context().spanId());
+        }
+        String traceparent = exchange.getRequest().getHeaders().getFirst("traceparent");
+        if (!StringUtils.hasText(traceparent)) {
+            return TraceIds.empty();
+        }
+        String[] parts = traceparent.split("-");
+        if (parts.length != 4 || parts[1].length() != 32 || parts[2].length() != 16) {
+            return TraceIds.empty();
+        }
+        return new TraceIds(parts[1], parts[2]);
+    }
+
+    private record TraceIds(String traceId, String spanId) {
+        static TraceIds empty() {
+            return new TraceIds("-", "-");
+        }
     }
 }
