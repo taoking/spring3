@@ -37,7 +37,7 @@
 | --- | --- |
 | `pom.xml` | 父工程、版本、依赖管理 |
 | `catalog-service/src/main/resources/application.yml` | 商品服务端口、商品样例、Actuator、Sentry |
-| `order-service/src/main/resources/application.yml` | 订单服务端口、Feign、缓存、Resilience4j、Actuator、Sentry |
+| `order-service/src/main/resources/application.yml` | 订单服务端口、HTTP client 模式、Feign、RestClient、缓存、Resilience4j、Actuator、Sentry |
 | `gateway-service/src/main/resources/application.yml` | 网关端口、静态路由、本地限流、fallback、Actuator |
 | `gateway-service/src/main/resources/application-nacos.yml` | 网关 Nacos 服务发现路由 |
 | `observability/docker-compose.yml` | Prometheus + Grafana + Zipkin |
@@ -54,6 +54,7 @@
 | `TRACING_SAMPLING_PROBABILITY` | trace 采样率，学习环境默认全采样 | `1.0` |
 | `ZIPKIN_TRACING_ENABLED` | 是否向 Zipkin 上报 trace | `true` |
 | `ZIPKIN_ENDPOINT` | Zipkin span 上报地址 | `http://localhost:9411/api/v2/spans` |
+| `DEMO_CLIENTS_CATALOG_MODE` | order-service 调用 catalog-service 的 HTTP client 模式：`feign` 或 `restclient` | `feign` |
 
 ## 构建与测试
 
@@ -178,6 +179,70 @@ curl -u user:user123 \
 curl -u user:user123 http://localhost:8080/api/orders/admin/stats
 curl -u admin:admin123 http://localhost:8080/api/orders/admin/stats
 ```
+
+## HTTP Client 模式
+
+`order-service` 默认使用 OpenFeign 调用 `catalog-service`。配置位于 `order-service/src/main/resources/application.yml`：
+
+```yaml
+demo:
+  clients:
+    catalog:
+      mode: feign
+      base-url: http://localhost:8081
+      username: user
+      password: user123
+      connect-timeout: 500ms
+      read-timeout: 800ms
+```
+
+RestClient 模式要求配置固定 `demo.clients.catalog.base-url`；Nacos 服务发现路径仍建议使用默认 Feign 模式。
+
+切换为 RestClient：
+
+```bash
+DEMO_CLIENTS_CATALOG_MODE=restclient ./mvnw -pl order-service spring-boot:run
+```
+
+或使用 jar 参数：
+
+```bash
+java -jar order-service/target/order-service-0.0.1-SNAPSHOT.jar \
+  --demo.clients.catalog.mode=restclient
+```
+
+验证 RestClient 正常调用：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8080/api/orders/preview
+```
+
+验证 RestClient fallback：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  'http://localhost:8080/api/orders/preview?failCatalog=true'
+```
+
+检查当前模式：
+
+```bash
+curl -u admin:admin123 http://localhost:8080/api/orders/admin/stats
+```
+
+HTTP client 选型对比：
+
+| Client | 风格 | 适合场景 | 注意点 |
+| --- | --- | --- | --- |
+| OpenFeign | 声明式接口 | Spring Cloud 微服务、服务发现、负载均衡、fallback 与治理能力集成 | 多一层代理和 Spring Cloud 依赖，复杂问题要理解 Feign、LoadBalancer、CircuitBreaker 各自边界 |
+| RestClient | Spring Framework 6 同步 fluent API | MVC 阻塞式服务间调用、简单外部 API、需要精确控制超时/认证/错误处理 | fallback、服务发现、重试等治理能力需要自行组合或接入其他组件 |
+| WebClient | 响应式 fluent API | WebFlux、流式响应、高并发非阻塞 IO、Gateway 相关场景 | 在纯 MVC 场景中为同步调用频繁 `.block()` 通常收益不大 |
+| `@HttpExchange` | Spring 原生声明式 HTTP Interface | 希望保留接口声明式写法，同时基于 RestClient 或 WebClient 适配 | Spring Cloud 生态能力不如 OpenFeign 完整，治理能力要额外设计 |
 
 ## Spring Cloud Gateway
 

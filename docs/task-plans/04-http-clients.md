@@ -40,6 +40,30 @@
 - catalog 返回 500 时，order 仍能按预期 fallback。
 - 文档包含选型对比和 curl 验证命令。
 
+## 实施记录
+
+- 已新增 `CatalogProductClient` 抽象，默认 `FeignCatalogProductClient` 保持原 OpenFeign 行为。
+- 已新增 `RestClientCatalogProductClient`，通过 `demo.clients.catalog.mode=restclient` 条件启用。
+- 已把 catalog 调用模式、连接超时和读取超时加入 `demo.clients.catalog.*` 配置。
+- 已抽取 `CatalogFallbackSupport`，Feign fallback 与 RestClient fallback 返回同一类降级结果。
+- 已在 `CatalogLookupService` 按调用模式选择实现，并把模式加入 Caffeine 缓存 key。
+- 已在 admin stats 中输出 `catalogClientMode`，方便运行时确认当前模式。
+- 已新增 `OrderRestClientModeTest`，覆盖 RestClient 正常调用、Basic Auth 出站、500 fallback 和读超时 fallback。
+- 已在 `docs/USAGE.md` 写入 OpenFeign、RestClient、WebClient、`@HttpExchange` 选型对比和 curl 验证命令。
+
+已验证：
+
+```bash
+./mvnw -pl order-service -am test
+./mvnw test
+./mvnw -Pnacos test
+./mvnw package -DskipTests
+```
+
+待后续扩展：
+
+- `@HttpExchange` 声明式接口示例可作为后续小任务补充，但当前任务已选择 RestClient 作为 Spring 原生 HTTP client 基线。
+
 ## 不做
 
 - 不移除 OpenFeign。

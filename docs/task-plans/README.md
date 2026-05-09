@@ -16,7 +16,7 @@
 | 1 | Nacos 实装（基线已完成） | [01-nacos.md](01-nacos.md) | P0 |
 | 2 | Spring Cloud Gateway（基线已完成） | [02-gateway.md](02-gateway.md) | P0 |
 | 3 | 链路追踪（基线已完成） | [03-tracing.md](03-tracing.md) | P0 |
-| 4 | RestClient / `@HttpExchange` | [04-http-clients.md](04-http-clients.md) | P0 |
+| 4 | RestClient / `@HttpExchange`（RestClient 基线已完成） | [04-http-clients.md](04-http-clients.md) | P0 |
 | 5 | OAuth2 Resource Server / JWT | [05-oauth2-jwt.md](05-oauth2-jwt.md) | P0 |
 | 6 | 自定义 starter / autoconfigure | [06-autoconfigure-starter.md](06-autoconfigure-starter.md) | P0 |
 | 7 | Resilience4j 深化 | [07-resilience4j.md](07-resilience4j.md) | P0 |

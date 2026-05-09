@@ -33,9 +33,12 @@ demo:
     heartbeat-delay: PT60S
   clients:
     catalog:
+      mode: feign
       base-url: http://localhost:8081
       username: user
       password: user123
+      connect-timeout: 500ms
+      read-timeout: 800ms
 
 resilience4j:
   circuitbreaker:

@@ -8,7 +8,7 @@
 
 - `common`：共享 DTO、AOP 注解等公共类型。
 - `catalog-service`：商品服务 provider，默认端口 `8081`。
-- `order-service`：订单服务 consumer，默认端口 `8080`，通过 OpenFeign 调用 `catalog-service`。
+- `order-service`：订单服务 consumer，默认端口 `8080`，默认通过 OpenFeign 调用 `catalog-service`，也可切换为 RestClient。
 - `gateway-service`：Spring Cloud Gateway 统一入口，默认端口 `8088`。
 
 ## 技术栈
@@ -17,7 +17,7 @@
 - Spring Boot 3.5.14
 - Spring Cloud 2025.0.2
 - Maven 多模块 + Maven Wrapper
-- Spring Web MVC、WebFlux Gateway、Validation、Security、OpenFeign、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI
+- Spring Web MVC、WebFlux Gateway、Validation、Security、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI
 
 ## 快速启动
 
@@ -107,7 +107,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Jakarta Validation 参数校验
 - `ProblemDetail` 统一错误响应
 - Spring Security Basic 与 `@PreAuthorize`
-- OpenFeign 服务间调用
+- OpenFeign 服务间调用，支持配置切换到 RestClient
 - Resilience4j 熔断降级
 - Spring Cloud Gateway 路由、过滤器、认证透传、限流、fallback
 - Micrometer Tracing + Zipkin 链路追踪，日志输出 traceId/spanId
@@ -125,6 +125,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Nacos 注册中心/配置中心：已补充本地 Docker Compose、版本基线、可选 Maven profile、`application-nacos.yml`、服务注册发现、配置中心接入和面试重点；默认运行路径不依赖 Nacos。
 - Gateway 服务发现路由：`gateway-service` 默认使用 localhost 静态路由，`nacos` profile 下切换为 `lb://catalog-service` 和 `lb://order-service`。
 - 链路追踪：已补充 Micrometer Tracing、Zipkin Docker Compose、日志关联 ID、Feign trace context 传播测试；默认运行路径不强制要求 Zipkin 已启动。
+- HTTP client 选型：已补充 RestClient 调用模式、超时/认证/fallback 复用、测试覆盖和 OpenFeign / RestClient / WebClient / `@HttpExchange` 对比。
 
 ### 后续计划
 
@@ -135,7 +136,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Nacos 深化：已完成 `nacos` profile、服务注册发现、启动期配置中心读取；后续补动态刷新、namespace/group 多环境隔离和 Testcontainers 集成测试。
 - Spring Cloud Gateway 深化：已完成 `gateway-service`、静态/Nacos 路由、过滤器、鉴权透传、限流和 fallback；后续可补灰度路由、跨域和更贴近生产的分布式限流。
 - 链路追踪深化：已完成 Micrometer Tracing + Zipkin 基线；后续可补 Tempo / OpenTelemetry Collector、采样策略、trace 与日志平台联查。
-- RestClient / `@HttpExchange`：补充 Spring 原生 HTTP client 示例，用于和 OpenFeign 做选型对比。
+- RestClient / `@HttpExchange`：已补充 RestClient 调用模式、统一 fallback、超时配置和选型对比；后续可补 `@HttpExchange` 声明式接口示例。
 - OAuth2 Resource Server / JWT：在 Basic Auth 之外补充 JWT 资源服务器示例，提升 Security 面试覆盖面。
 - 自动配置原理：新增 `demo-spring-boot-starter` 或 `demo-autoconfigure` 模块，演示 starter、条件装配和配置绑定。
 - Resilience4j 深化：补充 Retry、RateLimiter、Bulkhead、TimeLimiter，说明不同治理策略边界。

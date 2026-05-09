@@ -49,6 +49,7 @@ class OrderController {
                 "service", "order-service",
                 "status", "ready",
                 "currency", orderProperties.currency(),
+                "catalogClientMode", catalogClientProperties.mode(),
                 "catalogBaseUrlConfigured", catalogClientProperties.hasBaseUrl()
         );
     }

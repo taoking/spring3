@@ -9,6 +9,7 @@
 - `./mvnw test` 全部通过。
 - `catalog-service` 可以独立启动，`/actuator/health` 返回 `UP`。
 - `order-service` 可以独立启动，并通过 OpenFeign 调用 `catalog-service`。
+- `order-service` 可以通过 `demo.clients.catalog.mode=restclient` 切换为 RestClient 调用，并保留相同认证、超时和 fallback 行为。
 - `gateway-service` 可以独立启动，并能把 `/catalog/**`、`/orders/**` 路由到对应服务。
 - Swagger UI 可以访问并展示业务接口。
 - 未登录访问业务接口返回 `401`，普通用户访问 admin 接口返回 `403`。
@@ -36,8 +37,8 @@
 - 配置绑定：`@ConfigurationProperties`、YAML 配置。
 - 错误处理：`@RestControllerAdvice`、`@ExceptionHandler`、Spring Boot 3 `ProblemDetail`。
 - 安全：Spring Security Basic、`@PreAuthorize`、公开 health/prometheus/swagger。
-- 服务调用：OpenFeign、服务间 Basic Auth、超时配置。
-- 韧性：Spring Cloud CircuitBreaker + Resilience4j，Feign fallback。
+- 服务调用：OpenFeign、RestClient、服务间 Basic Auth、超时配置、调用模式配置切换。
+- 韧性：Spring Cloud CircuitBreaker + Resilience4j，Feign fallback，RestClient 统一 fallback 支撑。
 - 网关：Spring Cloud Gateway WebFlux、静态路由、Nacos 服务发现路由、全局过滤器、认证头透传、本地限流、CircuitBreaker fallback。
 - 缓存：Spring Cache + Caffeine。
 - AOP：自定义 `@DemoLog` 和耗时日志切面。
@@ -48,6 +49,26 @@
 - 错误上报：Sentry Jakarta starter，DSN 通过环境变量读取。
 - API 文档：SpringDoc OpenAPI / Swagger UI。
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
+
+### HTTP client 模式
+
+`order-service` 的 catalog 调用封装在 `CatalogProductClient` 抽象后面，当前提供两种实现：
+
+- `FeignCatalogProductClient`：默认模式，复用 OpenFeign、Spring Cloud CircuitBreaker 和现有 fallback。
+- `RestClientCatalogProductClient`：`demo.clients.catalog.mode=restclient` 时启用，使用 Spring Framework 6 `RestClient`、Basic Auth、独立连接/读取超时和同一套 fallback 结果。
+
+配置入口：
+
+```yaml
+demo:
+  clients:
+    catalog:
+      mode: feign
+      connect-timeout: 500ms
+      read-timeout: 800ms
+```
+
+`CatalogLookupService` 会按模式选择实现，并把模式写入缓存 key，避免 Feign 与 RestClient 在同一进程内切换时复用错误缓存结果。
 
 ## 运行方式
 
@@ -143,6 +164,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `catalog-service` 覆盖 health/prometheus 公开访问、业务认证、商品查询、404 ProblemDetail、admin 权限。
 - `order-service` 覆盖 health 公开访问、业务认证、参数校验、Feign 正常调用、Feign 失败降级、admin 权限、Prometheus endpoint。
 - `order-service` 增加 W3C `traceparent` 传播测试，验证 Feign 出站请求携带同一个 traceId。
+- `order-service` 增加 RestClient 模式测试，覆盖正常调用、Basic Auth 出站、500 fallback 和读超时 fallback。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - Feign 测试使用 MockWebServer，不依赖公网和手动启动 provider。
 

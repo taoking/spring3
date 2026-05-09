@@ -24,4 +24,5 @@ spring:
 demo:
   clients:
     catalog:
+      mode: feign
       base-url: ""
