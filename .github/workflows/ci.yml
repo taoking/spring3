@@ -43,3 +43,12 @@ jobs:
 
       - name: Run Testcontainers integration tests
         run: ./mvnw -B -Pintegration-test verify
+
+      - name: Run RabbitMQ integration tests
+        run: >
+          ./mvnw -B -Prabbitmq,integration-test -pl order-service -am
+          -Dtest=none
+          -Dsurefire.failIfNoSpecifiedTests=false
+          -Dit.test=OrderRabbitMqProfileIT
+          -Dfailsafe.failIfNoSpecifiedTests=false
+          verify

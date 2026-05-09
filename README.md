@@ -21,7 +21,7 @@
 - Spring Boot 3.5.14
 - Spring Cloud 2025.0.2
 - Maven 多模块 + Maven Wrapper
-- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI、Spring Cloud Contract、自定义 starter / autoconfigure
+- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI、Spring Cloud Contract、RabbitMQ 可选 profile、自定义 starter / autoconfigure
 
 ## 快速启动
 
@@ -36,6 +36,7 @@ Docker 可用时，可显式运行 Testcontainers 集成测试：
 
 ```bash
 ./mvnw -Pintegration-test verify
+./mvnw -Prabbitmq,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderRabbitMqProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
 ```
 
 默认账号：
@@ -54,6 +55,7 @@ Docker 可用时，可显式运行 Testcontainers 集成测试：
 - Order Prometheus metrics: `http://localhost:8080/actuator/prometheus`
 - Catalog Prometheus metrics: `http://localhost:8081/actuator/prometheus`
 - Zipkin UI: `http://localhost:9411/zipkin`
+- RabbitMQ Management UI: `http://localhost:15672`（`rabbitmq` profile 可选专题）
 
 ## 示例调用
 
@@ -148,6 +150,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - 结构化日志：已新增 `json-logging` profile，使用 Spring Boot 3.5 内建 structured logging 输出 JSON，并补充 requestId、traceId、spanId、status、elapsedMs 和敏感头脱敏测试。
 - API 治理：已补充 ProblemDetail 稳定错误码、requestId、timestamp、订单 v1/v2 示例、旧接口废弃头和 OpenAPI 分组。
 - Spring Cloud Contract：已补充 `catalog-service` provider 契约、生成 stubs jar、`order-service` consumer Stub Runner 测试，覆盖成功、商品不存在和模拟失败三类下游响应。
+- RabbitMQ 消息队列：已新增可选 `rabbitmq` Maven/Spring profile、本地 Compose、订单预览事件发布/消费、eventId 幂等、消费重试和 DLQ，以及 Testcontainers 集成测试；默认运行路径不引入 MQ。
 
 ### 后续计划
 
@@ -175,7 +178,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 
 #### P2：路线保留
 
-- Kafka、RabbitMQ、RocketMQ：先保留学习路线，重点理解投递语义、幂等、重试、顺序消息和死信队列；当前不引入运行依赖。
+- Kafka、RabbitMQ、RocketMQ：RabbitMQ 基线已完成；后续继续补 Kafka partition/offset/consumer group、RocketMQ tag/顺序/事务消息，并围绕投递语义、幂等、重试、顺序消息和死信队列做对比。
 - Native Image / AOT：作为 Spring Boot 3 亮点补充文档，暂不作为默认构建链路。
 - Kubernetes：先补部署和探针说明，不急于维护完整 K8s YAML。
 

@@ -1,0 +1,36 @@
+spring:
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: ${RABBITMQ_LISTENER_RETRY_MAX_ATTEMPTS:3}
+          initial-interval: ${RABBITMQ_LISTENER_RETRY_INITIAL_INTERVAL:200ms}
+          multiplier: ${RABBITMQ_LISTENER_RETRY_MULTIPLIER:2.0}
+          max-interval: ${RABBITMQ_LISTENER_RETRY_MAX_INTERVAL:2s}
+
+demo:
+  messaging:
+    rabbitmq:
+      exchange: ${ORDER_EVENT_EXCHANGE:spring3.order.events}
+      routing-key: ${ORDER_PREVIEW_ROUTING_KEY:order.preview.created}
+      queue: ${ORDER_PREVIEW_QUEUE:spring3.order.preview.created}
+      dead-letter-exchange: ${ORDER_EVENT_DLX:spring3.order.events.dlx}
+      dead-letter-routing-key: ${ORDER_PREVIEW_DLX_ROUTING_KEY:order.preview.created.dead}
+      dead-letter-queue: ${ORDER_PREVIEW_DLX_QUEUE:spring3.order.preview.created.dlq}
+      poison-sku: ${ORDER_PREVIEW_POISON_SKU:SKU-RABBITMQ-FAIL}
+
+management:
+  health:
+    rabbit:
+      enabled: true

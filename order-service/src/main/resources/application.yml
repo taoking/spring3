@@ -86,6 +86,9 @@ resilience4j:
         max-wait-duration: 0
 
 management:
+  health:
+    rabbit:
+      enabled: false
   prometheus:
     metrics:
       export:

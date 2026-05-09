@@ -20,6 +20,8 @@
 | Prometheus | `localhost:9090` |
 | Grafana | `localhost:3000` |
 | Zipkin | `localhost:9411` |
+| RabbitMQ AMQP | `localhost:5672` |
+| RabbitMQ Management | `localhost:15672` |
 | Nacos 控制台 | `localhost:8847` |
 | Nacos 客户端 API | `localhost:8848` |
 
@@ -30,6 +32,7 @@
 | 业务普通用户 | `user` | `user123` |
 | 业务管理员 | `admin` | `admin123` |
 | Grafana | `admin` | `admin` |
+| RabbitMQ Management | `guest` | `guest` |
 
 主要配置文件：
 
@@ -40,6 +43,7 @@
 | `demo-observability-spring-boot-starter/pom.xml` | starter 依赖聚合，业务服务只需要引入它 |
 | `catalog-service/src/main/resources/application.yml` | 商品服务端口、商品样例、Actuator、Sentry |
 | `order-service/src/main/resources/application.yml` | 订单服务端口、HTTP client 模式、Feign、RestClient、缓存、Resilience4j、Actuator、Sentry |
+| `order-service/src/main/resources/application-rabbitmq.yml` | RabbitMQ 连接、exchange/queue/DLQ、listener retry |
 | `gateway-service/src/main/resources/application.yml` | 网关端口、静态路由、本地限流、fallback、Actuator |
 | `gateway-service/src/main/resources/application-nacos.yml` | 网关 Nacos 服务发现路由 |
 | `observability/docker-compose.yml` | Prometheus + Grafana + Zipkin |
@@ -47,6 +51,7 @@
 | `deployment/docker-compose.yml` | 应用容器 + Prometheus + Grafana + Zipkin 一体化本地部署 |
 | `deployment/prometheus/prometheus.yml` | 容器网络内按服务名抓取业务服务指标 |
 | `platform/nacos/docker-compose.yml` | 本地 Nacos 3.0.3 |
+| `platform/rabbitmq/docker-compose.yml` | 本地 RabbitMQ + Management UI |
 
 常用环境变量：
 
@@ -60,6 +65,11 @@
 | `ZIPKIN_ENDPOINT` | Zipkin span 上报地址 | `http://localhost:9411/api/v2/spans` |
 | `DEMO_CLIENTS_CATALOG_MODE` | order-service 调用 catalog-service 的 HTTP client 模式：`feign` 或 `restclient` | `feign` |
 | `DEMO_SECURITY_JWT_SECRET` | `jwt` profile 下本地 HS256 测试 token 密钥，至少 32 字节 | `spring3-local-dev-secret-key-32-bytes-minimum` |
+| `RABBITMQ_HOST` | `rabbitmq` profile 下 RabbitMQ 主机 | `localhost` |
+| `RABBITMQ_PORT` | `rabbitmq` profile 下 RabbitMQ AMQP 端口 | `5672` |
+| `RABBITMQ_USERNAME` | `rabbitmq` profile 下 RabbitMQ 用户名 | `guest` |
+| `RABBITMQ_PASSWORD` | `rabbitmq` profile 下 RabbitMQ 密码 | `guest` |
+| `ORDER_PREVIEW_POISON_SKU` | RabbitMQ 消费失败演示 SKU | `SKU-RABBITMQ-FAIL` |
 | `JAVA_OPTS` | 容器内 JVM 参数，例如内存比例和 OOM 退出策略 | `-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError` |
 | `SERVER_SHUTDOWN` | Spring Boot 优雅停机开关 | `graceful` |
 | `SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE` | 优雅停机每阶段等待时间 | `20s` |
@@ -83,14 +93,20 @@ Docker Desktop 可用时运行 Testcontainers 集成测试：
 ./mvnw -pl gateway-service -am -Pintegration-test verify
 ```
 
-`integration-test` Maven profile 使用 Failsafe 执行 `**/*IT.java`，普通 `./mvnw test` 不会启动容器。当前 `GatewayNginxContainerIT` 使用固定镜像 `nginx:1.27.3-alpine` 模拟真实下游服务，验证 Gateway 路由、前缀改写和请求头处理。Docker 不可用时，Testcontainers 测试会通过 `disabledWithoutDocker` 跳过；本地需要先启动 Docker Desktop。
+只运行 RabbitMQ 容器集成测试：
+
+```bash
+./mvnw -Prabbitmq,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderRabbitMqProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
+```
+
+`integration-test` Maven profile 使用 Failsafe 执行 `**/*IT.java`，普通 `./mvnw test` 不会启动容器。当前 `GatewayNginxContainerIT` 使用固定镜像 `nginx:1.27.3-alpine` 模拟真实下游服务，`OrderRabbitMqProfileIT` 使用固定镜像 `rabbitmq:3.13-management` 验证消息生产、消费、幂等和 DLQ。RabbitMQ IT 还需要额外启用 Maven `-Prabbitmq`，所以默认 `./mvnw -Pintegration-test verify` 不会引入 MQ 依赖。Docker 不可用时，Testcontainers 测试会通过 `disabledWithoutDocker` 跳过；本地需要先启动 Docker Desktop。
 
 GitHub Actions：
 
 | Job | 命令 | 说明 |
 | --- | --- | --- |
 | `unit-tests` | `./mvnw -B test` | 默认轻量测试，不依赖 Docker |
-| `integration-tests` | `docker info`、`./mvnw -B -Pintegration-test verify` | Docker 可用时运行 Testcontainers 集成测试 |
+| `integration-tests` | `docker info`、`./mvnw -B -Pintegration-test verify`、RabbitMQ IT 命令 | Docker 可用时运行 Gateway 和 RabbitMQ Testcontainers 集成测试 |
 
 只测试单个模块：
 
@@ -696,6 +712,95 @@ Sentinel 与 Resilience4j 对比：
 - Sentinel 本地日志目录可通过 `SENTINEL_LOG_DIR` 设置，默认写入 `${user.home}/logs/csp`。
 - 本项目的 Sentinel 规则是本地内存规则，重启后重新加载；生产环境通常接 Dashboard、Nacos 或 Apollo 等数据源。
 - 当前熔断探针用慢调用比例复现；异常比例和异常数规则可用同一资源模型扩展。
+
+## RabbitMQ 消息队列
+
+RabbitMQ 是可选消息队列专题，默认 profile 不引入 AMQP 运行依赖。只有同时使用 Maven `-Prabbitmq` 和 Spring `SPRING_PROFILES_ACTIVE=rabbitmq` 时，才会编译并启用 `order-service/src/rabbitmq/java` 下的发布者、消费者和队列配置。
+
+当前示例围绕 `OrderPreviewCreatedEvent`：
+
+| 能力 | 当前实现 |
+| --- | --- |
+| 生产 | `RabbitOrderPreviewEventPublisher` 监听订单预览事件，通过 `RabbitTemplate` 发布 JSON 消息 |
+| 消费 | `RabbitOrderPreviewConsumer` 使用 `@RabbitListener` 消费订单预览队列 |
+| 幂等 | 使用 `eventId`，当前示例以 `orderId` 作为事件 ID，重复消息会被跳过 |
+| 重试 | `spring.rabbitmq.listener.simple.retry.*` 配置消费失败重试 |
+| 死信 | 主队列绑定 `x-dead-letter-exchange` 和 `x-dead-letter-routing-key`，重试耗尽后进入 DLQ |
+| 指标 | `orders.preview.rabbitmq.published.total`、`processed.total`、`duplicates.total`、`failed.total` |
+
+本地 RabbitMQ：
+
+```bash
+docker compose -f platform/rabbitmq/docker-compose.yml config
+docker compose -f platform/rabbitmq/docker-compose.yml up -d
+docker compose -f platform/rabbitmq/docker-compose.yml ps
+```
+
+管理界面：
+
+```text
+http://localhost:15672
+guest / guest
+```
+
+启动业务服务：
+
+```bash
+./mvnw -pl catalog-service spring-boot:run
+```
+
+```bash
+SPRING_PROFILES_ACTIVE=rabbitmq ./mvnw -Prabbitmq -pl order-service spring-boot:run
+```
+
+正常生产和消费：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-RABBITMQ-OK","quantity":2}' \
+  http://localhost:8080/api/orders/preview
+```
+
+消费失败、重试和死信：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-RABBITMQ-FAIL","quantity":2}' \
+  http://localhost:8080/api/orders/preview
+```
+
+查看队列和日志：
+
+```bash
+docker compose -f platform/rabbitmq/docker-compose.yml logs -f rabbitmq
+curl -u user:user123 http://localhost:8080/actuator/metrics/orders.preview.rabbitmq.published.total
+curl -u user:user123 http://localhost:8080/actuator/metrics/orders.preview.rabbitmq.failed.total
+```
+
+自动化验证：
+
+```bash
+./mvnw -Prabbitmq -pl order-service -am test -DskipTests
+./mvnw -Prabbitmq,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderRabbitMqProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
+```
+
+停止 RabbitMQ：
+
+```bash
+docker compose -f platform/rabbitmq/docker-compose.yml down
+```
+
+Kafka、RabbitMQ、RocketMQ 面试对比：
+
+| 维度 | RabbitMQ | Kafka | RocketMQ |
+| --- | --- | --- | --- |
+| 核心模型 | exchange、queue、binding、routing key | topic、partition、offset、consumer group | topic、tag、consumer group、queue |
+| 常见场景 | 业务异步解耦、复杂路由、重试/DLQ | 高吞吐事件流、日志流、数据管道 | 事务消息、顺序消息、延迟消息、国内业务中台 |
+| 顺序语义 | 单队列内有序，扩展并发后需业务设计 | partition 内有序，key 决定分区 | 支持顺序消息，需要选择队列和消费模型 |
+| 重试/DLQ | 队列参数和 listener retry 组合清晰 | 通常用 retry topic、DLT 或框架封装 | Broker 原生重试和死信语义更强 |
+| 面试重点 | ack/nack、DLX、publisher confirm、幂等消费 | offset 提交、rebalance、consumer lag、幂等 producer | tag 过滤、延迟级别、事务半消息、顺序消费 |
 
 ## OAuth2 Resource Server / JWT
 
@@ -1421,6 +1526,8 @@ lsof -nP -iTCP:8088 -sTCP:LISTEN
 lsof -nP -iTCP:9090 -sTCP:LISTEN
 lsof -nP -iTCP:3000 -sTCP:LISTEN
 lsof -nP -iTCP:9411 -sTCP:LISTEN
+lsof -nP -iTCP:5672 -sTCP:LISTEN
+lsof -nP -iTCP:15672 -sTCP:LISTEN
 lsof -nP -iTCP:8848 -sTCP:LISTEN
 ```
 
@@ -1440,6 +1547,7 @@ screen -S spring3-gateway -X quit
 docker compose -f deployment/docker-compose.yml down
 docker compose -f observability/docker-compose.yml down
 docker compose -f platform/nacos/docker-compose.yml down
+docker compose -f platform/rabbitmq/docker-compose.yml down
 ```
 
 查看工作区变更：

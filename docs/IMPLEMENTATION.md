@@ -19,7 +19,7 @@
 - Zipkin 可以查询一次 `gateway-service -> order-service -> catalog-service` 请求的 trace。
 - `order-service` 和 `catalog-service` 日志可以看到同一个 traceId。
 - 设置 `SENTRY_DSN` 后，调用异常触发接口能在 Sentry 看到事件。
-- `integration-test` profile 可以通过 Testcontainers 验证 Gateway 到容器化下游的真实路由。
+- `integration-test` profile 可以通过 Testcontainers 验证 Gateway 到容器化下游的真实路由；配合 `-Prabbitmq` 时可以验证 RabbitMQ 消息链路。
 - GitHub Actions 分别执行默认单元测试和 Docker 集成测试。
 - `catalog-service` 和 `order-service` 镜像可以构建，并能通过本地 Compose 在容器网络中完成服务间调用。
 - 容器版 Prometheus 可以通过服务名抓取业务服务指标。
@@ -28,8 +28,9 @@
 - 三个服务可以通过 `json-logging` profile 输出 JSON 日志，Servlet 服务请求日志包含 requestId、traceId、spanId、status、elapsedMs，并验证敏感认证头不会原样输出。
 - 错误响应包含稳定 `errorCode`、`requestId`、`timestamp`，订单服务同时提供 `/api/v1/orders/preview` 和 `/api/v2/orders/preview` 示例，旧 `/api/orders/preview` 返回废弃提示响应头。
 - `catalog-service` 可以通过 Spring Cloud Contract 生成 provider 验证测试和本地 `stubs` jar，`order-service` 可以使用 Stub Runner 消费 stubs 验证服务间契约。
+- `order-service` 可以通过 `-Prabbitmq` + `rabbitmq` profile 启用 RabbitMQ 订单预览事件示例，覆盖生产、消费、eventId 幂等、重试和死信队列。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
-- 项目没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖。
+- 默认 profile 没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖；RabbitMQ 仅作为隔离的可选 profile。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
 
 ## 当前实现
@@ -63,14 +64,15 @@
 - 结构化日志：`json-logging` profile 使用 Spring Boot 3.5 内建 structured logging 输出 logstash JSON，Servlet 请求日志由 observability starter 自动配置。
 - 错误上报：Sentry Jakarta starter，DSN 通过环境变量读取。
 - API 文档：SpringDoc OpenAPI / Swagger UI，按订单版本和 Catalog public/admin 分组。
-- 集成测试：`integration-test` Maven profile 使用 Failsafe 运行 `**/*IT.java`，当前通过 Testcontainers 启动固定版本 Nginx 容器验证 Gateway 真实下游。
-- CI：GitHub Actions 使用 JDK 21 和 Maven cache，默认 job 运行 `./mvnw -B test`，Docker job 运行 `./mvnw -B -Pintegration-test verify`。
+- 集成测试：`integration-test` Maven profile 使用 Failsafe 运行 `**/*IT.java`，当前通过 Testcontainers 启动固定版本 Nginx 容器验证 Gateway 真实下游，并在 `-Prabbitmq` 下启动固定版本 RabbitMQ 容器验证消息链路。
+- CI：GitHub Actions 使用 JDK 21 和 Maven cache，默认 job 运行 `./mvnw -B test`，Docker job 运行 `./mvnw -B -Pintegration-test verify` 和 RabbitMQ IT 命令。
 - 容器化：`catalog-service/Dockerfile` 和 `order-service/Dockerfile` 使用 JDK 21 JRE Alpine 镜像、非 root 用户和 `JAVA_OPTS`；`deployment/docker-compose.yml` 启动两个业务服务、Prometheus、Grafana、Zipkin。
 - 容器网络：`order-service` 在 Compose 中通过 `DEMO_CLIENTS_CATALOG_BASE_URL=http://catalog-service:8081` 调用 `catalog-service`，Prometheus 通过 `catalog-service:8081` 和 `order-service:8080` 抓取指标。
 - 虚拟线程：`order-service` 的 `virtual-thread` profile 设置 `spring.threads.virtual.enabled=true`，并把 `demoTaskExecutor` 从默认 `ThreadPoolTaskExecutor` 切换为虚拟线程 `SimpleAsyncTaskExecutor`。
 - 线程观察：`/api/orders/thread-probe` 支持请求线程和 `@Async` 线程两种模式，响应返回线程名、是否虚拟线程和模拟 I/O 等待时长。
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
 - Sentinel 可选专题：通过 `-Psentinel` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=sentinel` 加载本地 Flow、ParamFlow、Degrade 规则。
+- RabbitMQ 可选专题：通过 `-Prabbitmq` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=rabbitmq` 加载 AMQP 连接、exchange、queue、DLQ 和 listener retry 配置。
 - JSON 日志专题：`json-logging` profile 开启 `logging.structured.format.console=logstash` 和 `demo.observability.http-logging.enabled=true`。
 - API 治理专题：`common` 维护错误码常量，两个 Servlet 服务的 `ProblemDetail` 统一补充 `errorCode`、`requestId`、`timestamp`，订单服务提供 v1/v2 版本路由和旧路径废弃头。
 - 契约测试专题：`contract-test` Maven profile 启用 Spring Cloud Contract Verifier / Stub Runner，`catalog-service` 维护 provider 契约并生成 `stubs` classifier，`order-service` 使用本地 stubs 验证 consumer fallback 行为。
@@ -315,6 +317,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `order-service` 增加 JWT profile 测试，覆盖无 token、错误 token、普通用户 token、管理员 token，并验证服务间调用仍使用 Basic。
 - `order-service` 增加 `OrderJsonLoggingProfileTest`，覆盖 `json-logging` profile 输出合法 JSON、生成 `X-Request-Id`、请求日志字段和 `Authorization`/password 脱敏。
 - `order-service` 增加 `OrderCatalogContractStubTest`，在 `contract-test` profile 下使用 provider 生成的 stubs 验证正常响应、商品不存在和 catalog 模拟失败 fallback。
+- `order-service` 增加 `OrderRabbitMqProfileIT`，在 `rabbitmq` + `integration-test` profile 下用 Testcontainers 启动 `rabbitmq:3.13-management`，验证订单预览事件生产/消费、重复 eventId 幂等跳过和异常 SKU 重试后进入 DLQ。
 - `catalog-service` 增加 Spring Cloud Contract provider 测试，覆盖商品查询成功、`404 ProblemDetail` 和 `500 ProblemDetail` 的响应结构。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - `gateway-service` 增加 Testcontainers 集成测试，使用 `nginx:1.27.3-alpine` 作为容器化下游，覆盖真实 Gateway 路由到外部依赖的路径。
@@ -328,7 +331,9 @@ docker compose -f platform/nacos/docker-compose.yml config
 
 - 不接入 MySQL、PostgreSQL、JPA、MyBatis、Flyway、Liquibase。
 - 不接入 Redis 或 Spring Session Redis。
-- 不实现 Kafka、RabbitMQ、RocketMQ 代码。
+- 不实现 Kafka、RocketMQ 代码。
+- 不把 RabbitMQ 作为默认 profile 或核心业务路径的必需依赖。
+- 不实现数据库事务消息、outbox、分布式事务消息。
 - 不把 Nacos 作为默认 profile 的必需依赖。
 - 不把 Sentinel 作为默认 profile 的必需依赖。
 - 不把 Zipkin 作为业务服务启动的硬依赖。
