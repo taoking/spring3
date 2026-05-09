@@ -27,6 +27,8 @@ spring:
             logger-level: basic
 
 demo:
+  security:
+    mode: basic
   order:
     currency: CNY
     notification-delay: PT0.1S

@@ -17,7 +17,7 @@
 - Spring Boot 3.5.14
 - Spring Cloud 2025.0.2
 - Maven 多模块 + Maven Wrapper
-- Spring Web MVC、WebFlux Gateway、Validation、Security、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI
+- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI
 
 ## 快速启动
 
@@ -107,6 +107,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Jakarta Validation 参数校验
 - `ProblemDetail` 统一错误响应
 - Spring Security Basic 与 `@PreAuthorize`
+- OAuth2 Resource Server / JWT profile，支持 Bearer token、roles/scope 映射和方法级授权
 - OpenFeign 服务间调用，支持配置切换到 RestClient
 - Resilience4j 熔断降级
 - Spring Cloud Gateway 路由、过滤器、认证透传、限流、fallback
@@ -126,6 +127,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Gateway 服务发现路由：`gateway-service` 默认使用 localhost 静态路由，`nacos` profile 下切换为 `lb://catalog-service` 和 `lb://order-service`。
 - 链路追踪：已补充 Micrometer Tracing、Zipkin Docker Compose、日志关联 ID、Feign trace context 传播测试；默认运行路径不强制要求 Zipkin 已启动。
 - HTTP client 选型：已补充 RestClient 调用模式、超时/认证/fallback 复用、测试覆盖和 OpenFeign / RestClient / WebClient / `@HttpExchange` 对比。
+- JWT 资源服务器：已补充 `jwt` profile、HS256 本地开发 token、`roles` claim 到 `ROLE_*` 映射、scope 支持和无 token/错 token/权限不足测试；默认 Basic Auth 不变。
 
 ### 后续计划
 
@@ -137,7 +139,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Spring Cloud Gateway 深化：已完成 `gateway-service`、静态/Nacos 路由、过滤器、鉴权透传、限流和 fallback；后续可补灰度路由、跨域和更贴近生产的分布式限流。
 - 链路追踪深化：已完成 Micrometer Tracing + Zipkin 基线；后续可补 Tempo / OpenTelemetry Collector、采样策略、trace 与日志平台联查。
 - RestClient / `@HttpExchange`：已补充 RestClient 调用模式、统一 fallback、超时配置和选型对比；后续可补 `@HttpExchange` 声明式接口示例。
-- OAuth2 Resource Server / JWT：在 Basic Auth 之外补充 JWT 资源服务器示例，提升 Security 面试覆盖面。
+- OAuth2 Resource Server / JWT：已完成 JWT profile、Bearer token 验证、角色映射和测试；后续可补对接真实 IdP、JWK Set 和 client_credentials 服务间 token。
 - 自动配置原理：新增 `demo-spring-boot-starter` 或 `demo-autoconfigure` 模块，演示 starter、条件装配和配置绑定。
 - Resilience4j 深化：补充 Retry、RateLimiter、Bulkhead、TimeLimiter，说明不同治理策略边界。
 - Testcontainers / 集成测试：为 Nacos、Gateway 或外部组件补充可重复集成测试。

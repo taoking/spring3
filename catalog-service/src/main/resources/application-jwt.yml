@@ -1,0 +1,5 @@
+demo:
+  security:
+    mode: jwt
+    jwt:
+      secret: ${DEMO_SECURITY_JWT_SECRET:spring3-local-dev-secret-key-32-bytes-minimum}

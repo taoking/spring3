@@ -10,6 +10,7 @@
 - `catalog-service` 可以独立启动，`/actuator/health` 返回 `UP`。
 - `order-service` 可以独立启动，并通过 OpenFeign 调用 `catalog-service`。
 - `order-service` 可以通过 `demo.clients.catalog.mode=restclient` 切换为 RestClient 调用，并保留相同认证、超时和 fallback 行为。
+- `catalog-service` 和 `order-service` 可以通过 `jwt` profile 启用 OAuth2 Resource Server，Bearer token 能完成认证授权。
 - `gateway-service` 可以独立启动，并能把 `/catalog/**`、`/orders/**` 路由到对应服务。
 - Swagger UI 可以访问并展示业务接口。
 - 未登录访问业务接口返回 `401`，普通用户访问 admin 接口返回 `403`。
@@ -37,6 +38,7 @@
 - 配置绑定：`@ConfigurationProperties`、YAML 配置。
 - 错误处理：`@RestControllerAdvice`、`@ExceptionHandler`、Spring Boot 3 `ProblemDetail`。
 - 安全：Spring Security Basic、`@PreAuthorize`、公开 health/prometheus/swagger。
+- JWT：`jwt` profile 下启用 OAuth2 Resource Server，HS256 本地开发密钥验证 Bearer token，`roles` claim 映射到 `ROLE_*`，`scope` claim 映射到 `SCOPE_*`。
 - 服务调用：OpenFeign、RestClient、服务间 Basic Auth、超时配置、调用模式配置切换。
 - 韧性：Spring Cloud CircuitBreaker + Resilience4j，Feign fallback，RestClient 统一 fallback 支撑。
 - 网关：Spring Cloud Gateway WebFlux、静态路由、Nacos 服务发现路由、全局过滤器、认证头透传、本地限流、CircuitBreaker fallback。
@@ -69,6 +71,27 @@ demo:
 ```
 
 `CatalogLookupService` 会按模式选择实现，并把模式写入缓存 key，避免 Feign 与 RestClient 在同一进程内切换时复用错误缓存结果。
+
+### JWT profile
+
+默认安全模式是 `demo.security.mode=basic`，保持原有 Basic Auth 学习路径。`application-jwt.yml` 设置：
+
+```yaml
+demo:
+  security:
+    mode: jwt
+    jwt:
+      secret: ${DEMO_SECURITY_JWT_SECRET:spring3-local-dev-secret-key-32-bytes-minimum}
+```
+
+两个业务服务在 `jwt` profile 下都会启用 Resource Server：
+
+- 无 token 或错误 token 返回 `401`。
+- 普通用户 token 的 `roles=["USER"]` 能访问业务接口，但访问 admin 接口返回 `403`。
+- 管理员 token 的 `roles=["USER","ADMIN"]` 能访问 `@PreAuthorize("hasRole('ADMIN')")` 接口。
+- `scope` claim 也会转换为 `SCOPE_*` 权限，方便后续演示 scope 级授权。
+
+本项目为了保留服务间调用示例，在 JWT 模式下仍保留 Basic Auth。`order-service` 调用 `catalog-service` 继续使用现有 Basic 凭证；生产实现可以改为 OAuth2 `client_credentials` service token 或由网关/服务网格处理内部身份。
 
 ## 运行方式
 
@@ -162,9 +185,11 @@ docker compose -f platform/nacos/docker-compose.yml config
 ## 测试策略
 
 - `catalog-service` 覆盖 health/prometheus 公开访问、业务认证、商品查询、404 ProblemDetail、admin 权限。
+- `catalog-service` 增加 JWT profile 测试，覆盖无 token、错误 token、普通用户 token、管理员 token，以及 JWT 模式下 Basic 服务凭证仍可用于内部调用。
 - `order-service` 覆盖 health 公开访问、业务认证、参数校验、Feign 正常调用、Feign 失败降级、admin 权限、Prometheus endpoint。
 - `order-service` 增加 W3C `traceparent` 传播测试，验证 Feign 出站请求携带同一个 traceId。
 - `order-service` 增加 RestClient 模式测试，覆盖正常调用、Basic Auth 出站、500 fallback 和读超时 fallback。
+- `order-service` 增加 JWT profile 测试，覆盖无 token、错误 token、普通用户 token、管理员 token，并验证服务间调用仍使用 Basic。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - Feign 测试使用 MockWebServer，不依赖公网和手动启动 provider。
 

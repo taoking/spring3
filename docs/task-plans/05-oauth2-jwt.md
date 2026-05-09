@@ -40,6 +40,27 @@
 - 无 token、错误 token、权限不足 token 都返回符合预期的状态码。
 - 文档包含 token 生成和 curl 示例。
 
+## 实施记录
+
+- 已在 `catalog-service` 和 `order-service` 引入 `spring-boot-starter-oauth2-resource-server`，包含 Resource Server 和 JOSE/JWT 支撑。
+- 已新增 `application-jwt.yml`，通过 `SPRING_PROFILES_ACTIVE=jwt` 切换 `demo.security.mode=jwt`。
+- 已在两个服务的 `SecurityConfig` 中保留默认 Basic Auth，并新增 JWT Resource Server filter chain。
+- 已提供本地 HS256 开发密钥：`DEMO_SECURITY_JWT_SECRET`，默认值仅用于学习演示，不是生产密钥。
+- 已将 JWT `roles` claim 映射为 `ROLE_USER` / `ROLE_ADMIN`，并保留默认 `scope` 到 `SCOPE_*` 的映射。
+- 已明确服务间认证取舍：JWT profile 下仍保留 Basic 作为内部服务调用凭证；生产可替换为 `client_credentials` service token。
+- 已新增 `CatalogJwtSecurityTest`，覆盖 public endpoint、无 token、错误 token、普通用户 token、管理员 token、JWT 模式下 Basic 内部凭证。
+- 已新增 `OrderJwtSecurityTest`，覆盖无 token、错误 token、普通用户 token、管理员 token，并验证 order 调 catalog 仍使用 Basic。
+- 已在 `docs/USAGE.md` 写入 token 生成脚本和 curl 验证命令。
+
+已验证：
+
+```bash
+./mvnw -pl catalog-service,order-service -am test
+./mvnw test
+./mvnw -Pnacos test
+./mvnw package -DskipTests
+```
+
 ## 不做
 
 - 不实现完整登录页。

@@ -14,6 +14,8 @@ spring:
         enabled: false
 
 demo:
+  security:
+    mode: basic
   catalog:
     slow-delay: 2s
     products:

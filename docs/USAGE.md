@@ -55,6 +55,7 @@
 | `ZIPKIN_TRACING_ENABLED` | 是否向 Zipkin 上报 trace | `true` |
 | `ZIPKIN_ENDPOINT` | Zipkin span 上报地址 | `http://localhost:9411/api/v2/spans` |
 | `DEMO_CLIENTS_CATALOG_MODE` | order-service 调用 catalog-service 的 HTTP client 模式：`feign` 或 `restclient` | `feign` |
+| `DEMO_SECURITY_JWT_SECRET` | `jwt` profile 下本地 HS256 测试 token 密钥，至少 32 字节 | `spring3-local-dev-secret-key-32-bytes-minimum` |
 
 ## 构建与测试
 
@@ -243,6 +244,109 @@ HTTP client 选型对比：
 | RestClient | Spring Framework 6 同步 fluent API | MVC 阻塞式服务间调用、简单外部 API、需要精确控制超时/认证/错误处理 | fallback、服务发现、重试等治理能力需要自行组合或接入其他组件 |
 | WebClient | 响应式 fluent API | WebFlux、流式响应、高并发非阻塞 IO、Gateway 相关场景 | 在纯 MVC 场景中为同步调用频繁 `.block()` 通常收益不大 |
 | `@HttpExchange` | Spring 原生声明式 HTTP Interface | 希望保留接口声明式写法，同时基于 RestClient 或 WebClient 适配 | Spring Cloud 生态能力不如 OpenFeign 完整，治理能力要额外设计 |
+
+## OAuth2 Resource Server / JWT
+
+默认 profile 继续使用 Basic Auth。`jwt` profile 会启用 Spring Security OAuth2 Resource Server，支持 `Authorization: Bearer <token>`，并把 JWT 中的 `roles` claim 映射为 `ROLE_USER`、`ROLE_ADMIN`。`scope` claim 会保留为 Spring Security 默认的 `SCOPE_*` 权限。
+
+本学习项目在 `jwt` profile 下仍保留 Basic Auth，作为内部服务调用凭证；也就是说 `order-service -> catalog-service` 继续使用现有 Basic 认证。生产环境可把这部分替换为 OAuth2 `client_credentials` service token、mTLS 或网关内网鉴权。
+
+启动 JWT 模式：
+
+```bash
+SPRING_PROFILES_ACTIVE=jwt ./mvnw -pl catalog-service spring-boot:run
+```
+
+```bash
+SPRING_PROFILES_ACTIVE=jwt ./mvnw -pl order-service spring-boot:run
+```
+
+生成本地测试 token：
+
+```bash
+TOKEN=$(ROLE=ADMIN python3 - <<'PY'
+import base64
+import hashlib
+import hmac
+import json
+import os
+import time
+
+secret = os.environ.get(
+    "DEMO_SECURITY_JWT_SECRET",
+    "spring3-local-dev-secret-key-32-bytes-minimum",
+).encode()
+role = os.environ.get("ROLE", "USER").upper()
+roles = ["USER"]
+if role == "ADMIN":
+    roles.append("ADMIN")
+
+def b64url(data):
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+now = int(time.time())
+header = {"alg": "HS256", "typ": "JWT"}
+payload = {
+    "sub": role.lower(),
+    "iss": "spring3-local",
+    "iat": now,
+    "exp": now + 3600,
+    "roles": roles,
+    "scope": "orders:read catalog:read",
+}
+signing_input = ".".join([
+    b64url(json.dumps(header, separators=(",", ":")).encode()),
+    b64url(json.dumps(payload, separators=(",", ":")).encode()),
+])
+signature = hmac.new(secret, signing_input.encode(), hashlib.sha256).digest()
+print(signing_input + "." + b64url(signature))
+PY
+)
+```
+
+普通用户 token：
+
+```bash
+TOKEN=$(ROLE=USER python3 - <<'PY'
+import base64, hashlib, hmac, json, os, time
+secret = os.environ.get("DEMO_SECURITY_JWT_SECRET", "spring3-local-dev-secret-key-32-bytes-minimum").encode()
+now = int(time.time())
+def b64url(data): return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+header = {"alg": "HS256", "typ": "JWT"}
+payload = {"sub": "user", "iss": "spring3-local", "iat": now, "exp": now + 3600, "roles": ["USER"], "scope": "orders:read catalog:read"}
+signing_input = ".".join([b64url(json.dumps(header, separators=(",", ":")).encode()), b64url(json.dumps(payload, separators=(",", ":")).encode())])
+print(signing_input + "." + b64url(hmac.new(secret, signing_input.encode(), hashlib.sha256).digest()))
+PY
+)
+```
+
+调用 order 业务接口：
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8080/api/orders/preview
+```
+
+验证 admin 权限：
+
+```bash
+curl -i -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8080/api/orders/admin/stats
+```
+
+普通用户 token 预期返回 `403`；管理员 token 预期返回 `200`。
+
+验证无 token 和错误 token：
+
+```bash
+curl -i http://localhost:8080/api/orders/admin/stats
+curl -i -H 'Authorization: Bearer invalid.token.value' \
+  http://localhost:8080/api/orders/admin/stats
+```
+
+以上本地 HS256 密钥只用于学习演示。真实环境应使用授权服务器的 `issuer-uri` 或 `jwk-set-uri`，不要把生产私钥、长期有效 token 或真实密钥提交到仓库。
 
 ## Spring Cloud Gateway
 

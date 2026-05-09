@@ -14,7 +14,7 @@
 | P0 | Spring Cloud Gateway | 网关路由、过滤器、鉴权透传、限流、fallback 常在微服务架构题出现 | 已完成独立 `gateway-service`，覆盖静态/Nacos 路由、请求审计、认证透传、本地限流和 fallback |
 | P0 | 链路追踪 | 资深面试会问 metrics/logs/traces 三件套，不只问 Prometheus | 已完成 Micrometer Tracing + Zipkin 基线、日志 traceId/spanId、Feign W3C trace context 传播；后续可补 Tempo / OpenTelemetry Collector 和采样策略 |
 | P0 | RestClient / `@HttpExchange` | Spring 原生 HTTP client 是 OpenFeign 的重要对比项 | 已完成 RestClient 调用模式、超时/认证/fallback 复用、自动化测试和选型对比；后续可补 `@HttpExchange` 接口式示例 |
-| P0 | OAuth2 Resource Server / JWT | Security 面试通常会从 Basic 延伸到 JWT、OAuth2、鉴权边界 | 当前只有 Basic Auth，后续补 JWT resource server |
+| P0 | OAuth2 Resource Server / JWT | Security 面试通常会从 Basic 延伸到 JWT、OAuth2、鉴权边界 | 已完成 `jwt` profile、Bearer token 校验、roles/scope 映射、权限测试和服务间 Basic 取舍说明 |
 | P0 | Spring Boot 自动配置原理 | `@SpringBootApplication`、条件装配、starter、配置绑定几乎必问 | 代码已使用，建议补一篇源码阅读笔记 |
 | P0 | 自定义 starter / autoconfigure | 能把自动配置原理从口头解释落到代码 | 后续新增 `demo-spring-boot-starter` 或 `demo-autoconfigure` 模块 |
 | P0 | AOP 与事务边界 | 代理类型、自调用失效、注解生效条件是高频陷阱 | 当前无数据库事务，可用 AOP 示例延伸说明 |
