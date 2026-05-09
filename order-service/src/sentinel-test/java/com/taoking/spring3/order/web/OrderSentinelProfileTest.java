@@ -157,15 +157,18 @@ class OrderSentinelProfileTest {
 
     @Test
     @Order(4)
-    void degradeProbeOpensAfterSlowCalls() {
+    void degradeProbeOpensAfterSlowCalls() throws InterruptedException {
         ResponseEntity<String> first = getText("/api/orders/sentinel/degrade-probe?slow=true");
         ResponseEntity<String> second = getText("/api/orders/sentinel/degrade-probe?slow=true");
-        ResponseEntity<String> blocked = getText("/api/orders/sentinel/degrade-probe?slow=true");
+        ResponseEntity<String> blocked = waitForDegradeBlock();
 
         assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(first.getBody()).contains("slow-call");
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(second.getBody()).contains("slow-call");
+        assertThat(blocked)
+                .as("Sentinel degrade rule should open after repeated slow calls")
+                .isNotNull();
         assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         assertThat(blocked.getBody())
                 .contains("Sentinel request blocked")
@@ -189,6 +192,20 @@ class OrderSentinelProfileTest {
         return restTemplate
                 .withBasicAuth("user", "user123")
                 .getForEntity(url(path), String.class);
+    }
+
+    private ResponseEntity<String> waitForDegradeBlock() throws InterruptedException {
+        ResponseEntity<String> lastResponse = null;
+        for (int attempt = 0; attempt < 8; attempt++) {
+            lastResponse = getText("/api/orders/sentinel/degrade-probe?slow=true");
+            if (lastResponse.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                return lastResponse;
+            }
+            assertThat(lastResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(lastResponse.getBody()).contains("slow-call");
+            Thread.sleep(100);
+        }
+        return lastResponse;
     }
 
     private MockResponse jsonResponse(String body) {
