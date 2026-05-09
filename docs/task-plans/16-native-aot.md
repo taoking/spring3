@@ -23,6 +23,40 @@
 - 或 `./mvnw -pl catalog-service spring-boot:build-image -Pnative`
 - 启动 native 二进制后访问 `/actuator/health`。
 
+## 当前实施结果
+
+- 已新增专题文档：[Native Image / AOT 专题](../native-aot.md)。
+- 未新增仓库自定义 native Maven profile，因为 Spring Boot starter parent `3.5.14` 已内置 `native` profile。
+- 已选择 `catalog-service` 作为最小验证目标。
+- 已确认 `catalog-service` 普通 jar 构建不受影响。
+- 已完成 `catalog-service` Spring AOT 处理验证。
+- 已尝试 `catalog-service` native binary 编译，当前本机失败原因是未安装 GraalVM `native-image`。
+- 未把 native 构建加入默认 CI。
+
+## 已执行验证
+
+通过：
+
+```bash
+./mvnw help:active-profiles -Pnative -pl catalog-service -am
+./mvnw -pl catalog-service -am package -DskipTests
+./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests
+```
+
+已尝试但本机失败：
+
+```bash
+./mvnw -Pnative -pl catalog-service native:compile -DskipTests
+```
+
+失败原因：
+
+```text
+The 'native-image' tool was not found on your system.
+```
+
+后续如果要继续验证 native binary，需要先安装 GraalVM JDK 21 并确保 `native-image` 在 `PATH` 中，或使用 Docker buildpacks native 构建。
+
 ## 实施要点
 
 - Native 构建耗时长，对本地环境要求高。
@@ -35,6 +69,7 @@
 - native profile 不影响普通 jar 构建。
 - 至少 catalog-service 有明确 native 构建尝试结果。
 - 文档记录成功命令或失败原因和后续处理建议。
+- README、使用说明、实施文档和面试路线包含专题入口。
 
 ## 不做
 

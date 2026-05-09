@@ -28,7 +28,7 @@
 | 13 | API 治理（基线已完成） | [13-api-governance.md](13-api-governance.md) | P1 |
 | 14 | Spring Cloud Contract（基线已完成） | [14-contract-testing.md](14-contract-testing.md) | P1 |
 | 15 | 消息队列（RabbitMQ 基线已完成） | [15-messaging.md](15-messaging.md) | P2 |
-| 16 | Native Image / AOT | [16-native-aot.md](16-native-aot.md) | P2 |
+| 16 | Native Image / AOT（文档和 catalog AOT 基线已完成） | [16-native-aot.md](16-native-aot.md) | P2 |
 | 17 | Kubernetes | [17-kubernetes.md](17-kubernetes.md) | P2 |
 
 ## 通用执行约束

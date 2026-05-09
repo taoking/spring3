@@ -29,6 +29,7 @@
 - 错误响应包含稳定 `errorCode`、`requestId`、`timestamp`，订单服务同时提供 `/api/v1/orders/preview` 和 `/api/v2/orders/preview` 示例，旧 `/api/orders/preview` 返回废弃提示响应头。
 - `catalog-service` 可以通过 Spring Cloud Contract 生成 provider 验证测试和本地 `stubs` jar，`order-service` 可以使用 Stub Runner 消费 stubs 验证服务间契约。
 - `order-service` 可以通过 `-Prabbitmq` + `rabbitmq` profile 启用 RabbitMQ 订单预览事件示例，覆盖生产、消费、eventId 幂等、重试和死信队列。
+- `catalog-service` 可以完成 Spring AOT 处理，Native Image / AOT 构建命令、兼容注意事项和失败排查已文档化；native binary 编译不进入默认 CI。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 默认 profile 没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖；RabbitMQ 仅作为隔离的可选 profile。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
@@ -73,6 +74,7 @@
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
 - Sentinel 可选专题：通过 `-Psentinel` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=sentinel` 加载本地 Flow、ParamFlow、Degrade 规则。
 - RabbitMQ 可选专题：通过 `-Prabbitmq` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=rabbitmq` 加载 AMQP 连接、exchange、queue、DLQ 和 listener retry 配置。
+- Native Image / AOT：使用 Spring Boot parent 内置 `native` profile 做手动学习验证，当前以 `catalog-service` 为最小目标；本机已通过 `spring-boot:process-aot`，`native:compile` 因未安装 GraalVM `native-image` 而停止。
 - JSON 日志专题：`json-logging` profile 开启 `logging.structured.format.console=logstash` 和 `demo.observability.http-logging.enabled=true`。
 - API 治理专题：`common` 维护错误码常量，两个 Servlet 服务的 `ProblemDetail` 统一补充 `errorCode`、`requestId`、`timestamp`，订单服务提供 v1/v2 版本路由和旧路径废弃头。
 - 契约测试专题：`contract-test` Maven profile 启用 Spring Cloud Contract Verifier / Stub Runner，`catalog-service` 维护 provider 契约并生成 `stubs` classifier，`order-service` 使用本地 stubs 验证 consumer fallback 行为。
@@ -210,6 +212,24 @@ Consumer 侧：
 - MockWebServer 继续用于验证 Feign/RestClient 的请求头、超时和 fallback 细节。
 - Spring Cloud Contract 用于把 provider 的 HTTP 响应结构固化为契约，防止 provider 改坏字段后 consumer 测试仍然使用过期手写 mock。
 
+### Native Image / AOT
+
+Native Image / AOT 不新增业务依赖，也不改变默认构建链路。Spring Boot starter parent `3.5.14` 已提供 `native` Maven profile，本项目只补充文档化命令和 `catalog-service` 最小验证路径。
+
+当前验证结果：
+
+- `./mvnw help:active-profiles -Pnative -pl catalog-service -am` 可以看到 Spring Boot parent 提供的 `native` profile。
+- `./mvnw -pl catalog-service -am package -DskipTests` 通过，说明普通 jar 构建不受影响。
+- `./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests` 通过，说明 `catalog-service` 可以完成 Spring AOT 处理。
+- `./mvnw -Pnative -pl catalog-service native:compile -DskipTests` 已尝试，当前本机失败原因是未安装 GraalVM `native-image`。
+
+执行原则：
+
+- 先验证依赖最少的 `catalog-service`，再考虑 `order-service` 和 `gateway-service`。
+- 不把 native binary 构建加入默认 CI，避免普通反馈链路变慢。
+- 不直接对聚合依赖模块执行 `spring-boot:process-aot`，因为 `common` 和 starter 模块没有 main class。
+- SpringDoc、Sentry、OpenFeign、Gateway、Resilience4j、AOP 和 Jackson 的 native 兼容性需要在后续扩展时逐项验证。
+
 ## 运行方式
 
 ```bash
@@ -218,6 +238,7 @@ Consumer 侧：
 ./mvnw -Pcontract-test -pl catalog-service -am test
 ./mvnw -Pcontract-test -pl catalog-service -am install
 ./mvnw -Pcontract-test -pl order-service -am -Dtest=OrderCatalogContractStubTest -Dsurefire.failIfNoSpecifiedTests=false test
+./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests
 ./mvnw package -DskipTests
 docker compose -f deployment/docker-compose.yml up -d
 ./mvnw -pl catalog-service spring-boot:run
@@ -319,6 +340,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `order-service` 增加 `OrderCatalogContractStubTest`，在 `contract-test` profile 下使用 provider 生成的 stubs 验证正常响应、商品不存在和 catalog 模拟失败 fallback。
 - `order-service` 增加 `OrderRabbitMqProfileIT`，在 `rabbitmq` + `integration-test` profile 下用 Testcontainers 启动 `rabbitmq:3.13-management`，验证订单预览事件生产/消费、重复 eventId 幂等跳过和异常 SKU 重试后进入 DLQ。
 - `catalog-service` 增加 Spring Cloud Contract provider 测试，覆盖商品查询成功、`404 ProblemDetail` 和 `500 ProblemDetail` 的响应结构。
+- `catalog-service` 已执行 Spring AOT 处理验证；native binary 编译已记录本机缺少 GraalVM `native-image` 的失败原因和后续处理建议。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - `gateway-service` 增加 Testcontainers 集成测试，使用 `nginx:1.27.3-alpine` 作为容器化下游，覆盖真实 Gateway 路由到外部依赖的路径。
 - `.github/workflows/ci.yml` 包含 `unit-tests` 和 `integration-tests` 两个 job，分别覆盖默认测试和 Docker 集成测试。
@@ -334,6 +356,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - 不实现 Kafka、RocketMQ 代码。
 - 不把 RabbitMQ 作为默认 profile 或核心业务路径的必需依赖。
 - 不实现数据库事务消息、outbox、分布式事务消息。
+- 不把 native binary 构建加入默认 CI 或默认发布路径。
 - 不把 Nacos 作为默认 profile 的必需依赖。
 - 不把 Sentinel 作为默认 profile 的必需依赖。
 - 不把 Zipkin 作为业务服务启动的硬依赖。

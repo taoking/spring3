@@ -2,7 +2,7 @@
 
 ## 已覆盖内容
 
-当前项目已经覆盖 Web MVC、Validation、ProblemDetail、Security、OpenFeign、Resilience4j、Caffeine、AOP、Async、Scheduled、Spring Event、Actuator、Micrometer、Prometheus、Grafana、Micrometer Tracing、Zipkin、Sentry、OpenAPI、Spring Cloud Contract、RabbitMQ 可选示例和测试。
+当前项目已经覆盖 Web MVC、Validation、ProblemDetail、Security、OpenFeign、Resilience4j、Caffeine、AOP、Async、Scheduled、Spring Event、Actuator、Micrometer、Prometheus、Grafana、Micrometer Tracing、Zipkin、Sentry、OpenAPI、Spring Cloud Contract、RabbitMQ 可选示例和测试，以及 Native Image / AOT 专题文档和 `catalog-service` AOT 基线。
 
 ## 建议优先补充
 
@@ -28,7 +28,7 @@
 | P1 | Spring Cloud Contract | 微服务 provider/consumer 变更风险控制 | 已完成 catalog provider 契约、stubs jar、本地 Stub Runner consumer 测试，覆盖成功、404、500 三类响应 |
 | P2 | 消息队列 | Kafka/RabbitMQ/RocketMQ 的投递语义、幂等、重试、顺序消息 | 已完成 RabbitMQ 可选 profile、订单事件生产/消费、eventId 幂等、重试和 DLQ；Kafka/RocketMQ 保留路线对比 |
 | P2 | Testcontainers | 集成测试、外部依赖隔离、CI 可重复性 | 已完成 Gateway 下游容器集成测试和 GitHub Actions；后续可扩展到 Nacos |
-| P2 | Native Image/AOT | Spring Boot 3 亮点之一，适合了解限制和收益 | 后续可加文档，不必默认构建 |
+| P2 | Native Image/AOT | Spring Boot 3 亮点之一，适合了解限制和收益 | 已补专题文档，`catalog-service` `process-aot` 通过；本机 `native:compile` 阻塞于缺少 GraalVM `native-image` |
 | P2 | Kubernetes | 部署、探针、滚动发布、配置注入会被问，但本项目不急于维护完整 YAML | 先补部署说明，后续视需要加示例 |
 
 ## 面试复盘清单
@@ -47,6 +47,7 @@
 - 能说明错误码稳定性、API 版本兼容、废弃接口 Sunset 策略和 OpenAPI 分组方式。
 - 能说明 Spring Cloud Contract 和 MockWebServer 的区别，以及 provider stubs 如何被 consumer CI 使用。
 - 能说明 RabbitMQ exchange/queue/binding、ack/nack、listener retry、DLQ、publisher confirm 和消费幂等的边界，并能和 Kafka/RocketMQ 对比。
+- 能说明 AOT 和 Native Image 的区别、收益、代价，以及反射、动态代理、SpringDoc、Sentry、Feign 在 native 场景下为什么要单独验证。
 - 能说明服务注册和配置中心在故障场景下的降级策略。
 - 能说明 Gateway 在认证、鉴权、路由、限流、跨域、灰度上的职责边界。
 - 能说明 JWT/OAuth2 Resource Server 的认证与授权流程，以及和 session 登录的差异。

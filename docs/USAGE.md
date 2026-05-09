@@ -52,6 +52,7 @@
 | `deployment/prometheus/prometheus.yml` | 容器网络内按服务名抓取业务服务指标 |
 | `platform/nacos/docker-compose.yml` | 本地 Nacos 3.0.3 |
 | `platform/rabbitmq/docker-compose.yml` | 本地 RabbitMQ + Management UI |
+| `docs/native-aot.md` | Spring AOT / Native Image 构建、验证和排障说明 |
 
 常用环境变量：
 
@@ -73,6 +74,7 @@
 | `JAVA_OPTS` | 容器内 JVM 参数，例如内存比例和 OOM 退出策略 | `-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError` |
 | `SERVER_SHUTDOWN` | Spring Boot 优雅停机开关 | `graceful` |
 | `SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE` | 优雅停机每阶段等待时间 | `20s` |
+| `GRAALVM_HOME` | Native Image 本地编译时可指向 GraalVM JDK 21 | 未设置 |
 
 ## 构建与测试
 
@@ -115,6 +117,16 @@ GitHub Actions：
 ./mvnw -pl order-service test
 ./mvnw -pl gateway-service test
 ```
+
+Native / AOT 手动验证命令：
+
+```bash
+./mvnw -pl catalog-service -am package -DskipTests
+./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests
+./mvnw -Pnative -pl catalog-service native:compile -DskipTests
+```
+
+`native:compile` 需要本机安装 GraalVM `native-image`。当前仓库不把 native 构建加入默认 CI。
 
 清理构建产物：
 
@@ -801,6 +813,67 @@ Kafka、RabbitMQ、RocketMQ 面试对比：
 | 顺序语义 | 单队列内有序，扩展并发后需业务设计 | partition 内有序，key 决定分区 | 支持顺序消息，需要选择队列和消费模型 |
 | 重试/DLQ | 队列参数和 listener retry 组合清晰 | 通常用 retry topic、DLT 或框架封装 | Broker 原生重试和死信语义更强 |
 | 面试重点 | ack/nack、DLX、publisher confirm、幂等消费 | offset 提交、rebalance、consumer lag、幂等 producer | tag 过滤、延迟级别、事务半消息、顺序消费 |
+
+## Native Image / AOT
+
+Native Image / AOT 是 Spring Boot 3 专题内容，当前只做手动学习和验证，不进入默认构建、默认 CI 或默认发布路径。完整说明见 [Native Image / AOT 专题](native-aot.md)。
+
+当前已验证：
+
+| 项目 | 结果 |
+| --- | --- |
+| `catalog-service` 普通 jar 构建 | 通过 |
+| `catalog-service` `spring-boot:process-aot` | 通过 |
+| `catalog-service` `native:compile` | 已尝试，本机缺少 GraalVM `native-image`，未生成 binary |
+
+检查环境：
+
+```bash
+java -version
+command -v native-image
+native-image --version
+```
+
+确认 Spring Boot parent 提供的 `native` profile：
+
+```bash
+./mvnw help:active-profiles -Pnative -pl catalog-service -am
+```
+
+执行 AOT 处理：
+
+```bash
+./mvnw -pl catalog-service -am package -DskipTests
+./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests
+```
+
+不要直接把 `-am` 和 `spring-boot:process-aot` 组合使用，因为 `common` 和 starter 模块不是可启动应用，没有 main class。
+
+本机 GraalVM native binary 构建：
+
+```bash
+./mvnw -Pnative -pl catalog-service native:compile -DskipTests
+ZIPKIN_TRACING_ENABLED=false catalog-service/target/catalog-service --server.port=8081
+curl -fsS http://localhost:8081/actuator/health
+```
+
+Docker buildpacks native 镜像构建：
+
+```bash
+./mvnw -Pnative -pl catalog-service spring-boot:build-image \
+  -DskipTests \
+  -Dspring-boot.build-image.imageName=spring3/catalog-service-native:local
+
+docker run --rm -p 8081:8081 \
+  -e ZIPKIN_TRACING_ENABLED=false \
+  spring3/catalog-service-native:local
+```
+
+排查重点：
+
+- `native-image` 不存在时，先安装 GraalVM JDK 21 并设置 `JAVA_HOME` 或 `GRAALVM_HOME`。
+- SpringDoc、Sentry、Feign、Gateway、AOP、Jackson 和动态代理都需要 native 后分别验证，不要默认认为 JVM 运行成功就等于 native 可用。
+- 第一次 native 构建耗时明显长于普通 jar 构建，学习项目先从 `catalog-service` 做最小闭环。
 
 ## OAuth2 Resource Server / JWT
 
