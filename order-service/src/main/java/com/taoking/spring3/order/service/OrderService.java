@@ -16,19 +16,19 @@ import org.springframework.stereotype.Service;
 @Service
 public class OrderService {
 
-    private final CatalogLookupService catalogLookupService;
+    private final CatalogGovernanceService catalogGovernanceService;
     private final NotificationService notificationService;
     private final ApplicationEventPublisher eventPublisher;
     private final Counter previewCounter;
     private final Counter fallbackCounter;
 
     public OrderService(
-            CatalogLookupService catalogLookupService,
+            CatalogGovernanceService catalogGovernanceService,
             NotificationService notificationService,
             ApplicationEventPublisher eventPublisher,
             MeterRegistry meterRegistry
     ) {
-        this.catalogLookupService = catalogLookupService;
+        this.catalogGovernanceService = catalogGovernanceService;
         this.notificationService = notificationService;
         this.eventPublisher = eventPublisher;
         this.previewCounter = Counter.builder("orders.preview.total")
@@ -40,9 +40,16 @@ public class OrderService {
     }
 
     @DemoLog("order.preview")
-    public OrderPreviewResponse preview(OrderPreviewRequest request, boolean slowCatalog, boolean failCatalog) {
+    public OrderPreviewResponse preview(
+            OrderPreviewRequest request,
+            boolean slowCatalog,
+            boolean failCatalog,
+            boolean rateLimit,
+            boolean bulkhead,
+            boolean holdBulkhead
+    ) {
         previewCounter.increment();
-        ProductResponse product = catalogLookupService.getProduct(request.sku(), slowCatalog, failCatalog);
+        ProductResponse product = getProduct(request, slowCatalog, failCatalog, rateLimit, bulkhead, holdBulkhead);
         if (product.fallback()) {
             fallbackCounter.increment();
         }
@@ -61,5 +68,32 @@ public class OrderService {
         eventPublisher.publishEvent(new OrderPreviewCreatedEvent(response, Instant.now()));
         notificationService.sendPreviewNotification(orderId);
         return response;
+    }
+
+    private ProductResponse getProduct(
+            OrderPreviewRequest request,
+            boolean slowCatalog,
+            boolean failCatalog,
+            boolean rateLimit,
+            boolean bulkhead,
+            boolean holdBulkhead
+    ) {
+        if (bulkhead) {
+            return catalogGovernanceService.getProductWithBulkhead(
+                    request.sku(),
+                    slowCatalog,
+                    failCatalog,
+                    holdBulkhead
+            );
+        }
+        if (rateLimit) {
+            return catalogGovernanceService.getProductWithRateLimit(request.sku(), slowCatalog, failCatalog);
+        }
+        if (slowCatalog) {
+            return catalogGovernanceService.getProductWithTimeLimiter(request.sku(), true, failCatalog)
+                    .toCompletableFuture()
+                    .join();
+        }
+        return catalogGovernanceService.getProduct(request.sku(), false, failCatalog);
     }
 }

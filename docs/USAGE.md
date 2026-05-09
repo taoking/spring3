@@ -194,7 +194,7 @@ curl -u user:user123 \
   http://localhost:8080/api/orders/preview
 ```
 
-触发 Feign fallback：
+触发 catalog fallback：
 
 ```bash
 curl -u user:user123 \
@@ -232,7 +232,7 @@ demo:
       username: user
       password: user123
       connect-timeout: 500ms
-      read-timeout: 800ms
+      read-timeout: 3s
 ```
 
 RestClient 模式要求配置固定 `demo.clients.catalog.base-url`；Nacos 服务发现路径仍建议使用默认 Feign 模式。
@@ -282,6 +282,114 @@ HTTP client 选型对比：
 | RestClient | Spring Framework 6 同步 fluent API | MVC 阻塞式服务间调用、简单外部 API、需要精确控制超时/认证/错误处理 | fallback、服务发现、重试等治理能力需要自行组合或接入其他组件 |
 | WebClient | 响应式 fluent API | WebFlux、流式响应、高并发非阻塞 IO、Gateway 相关场景 | 在纯 MVC 场景中为同步调用频繁 `.block()` 通常收益不大 |
 | `@HttpExchange` | Spring 原生声明式 HTTP Interface | 希望保留接口声明式写法，同时基于 RestClient 或 WebClient 适配 | Spring Cloud 生态能力不如 OpenFeign 完整，治理能力要额外设计 |
+
+## Resilience4j 服务治理
+
+`order-service` 在 catalog 调用边界增加了 `CatalogGovernanceService`。默认正常路径仍调用 `POST /api/orders/preview`，下面参数用于稳定触发治理策略：
+
+| 参数 | 触发策略 | 说明 |
+| --- | --- | --- |
+| `failCatalog=true` | Retry + CircuitBreaker + fallback | 下游返回 fallback 后，治理层把它视为失败并按配置重试，最终返回明确的降级商品 |
+| `slowCatalog=true` | TimeLimiter + fallback | catalog 慢响应会被 `resilience4j.timelimiter.instances.catalog-service.timeout-duration` 截断 |
+| `rateLimit=true` | RateLimiter + fallback | 本地演示配置为每个刷新周期只放行 1 次，连续调用第二次会被限流 |
+| `bulkhead=true&holdBulkhead=true` | Bulkhead + fallback | 第一个请求持有舱壁，第二个并发请求会触发 bulkhead full |
+
+配置集中在 `order-service/src/main/resources/application.yml`：
+
+```yaml
+demo:
+  resilience:
+    catalog:
+      async-pool-size: 4
+      bulkhead-hold-duration: 1s
+
+resilience4j:
+  retry:
+    instances:
+      catalog-service:
+        max-attempts: 3
+        wait-duration: 100ms
+  circuitbreaker:
+    instances:
+      catalog-service:
+        sliding-window-size: 5
+        minimum-number-of-calls: 2
+  timelimiter:
+    instances:
+      catalog-service:
+        timeout-duration: 1s
+  ratelimiter:
+    instances:
+      catalog-rate-limit:
+        limit-for-period: 1
+        limit-refresh-period: 10s
+  bulkhead:
+    instances:
+      catalog-bulkhead:
+        max-concurrent-calls: 1
+        max-wait-duration: 0
+```
+
+触发失败重试和熔断统计：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  'http://localhost:8080/api/orders/preview?failCatalog=true'
+```
+
+触发慢调用超时：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  'http://localhost:8080/api/orders/preview?slowCatalog=true'
+```
+
+触发限流：
+
+```bash
+for sku in SKU-RATE-1 SKU-RATE-2; do
+  curl -s -u user:user123 \
+    -H 'Content-Type: application/json' \
+    -d "{\"sku\":\"$sku\",\"quantity\":1}" \
+    'http://localhost:8080/api/orders/preview?rateLimit=true'
+  echo
+done
+```
+
+触发 Bulkhead full：
+
+```bash
+for sku in SKU-BH-1 SKU-BH-2; do
+  curl -s -u user:user123 \
+    -H 'Content-Type: application/json' \
+    -d "{\"sku\":\"$sku\",\"quantity\":1}" \
+    'http://localhost:8080/api/orders/preview?bulkhead=true&holdBulkhead=true' &
+done
+wait
+```
+
+直接查看本机指标：
+
+```bash
+curl -fsS http://localhost:8080/actuator/prometheus \
+  | rg 'resilience4j_(retry|circuitbreaker|timelimiter|ratelimiter|bulkhead)'
+```
+
+策略边界：
+
+| 策略 | 适合 | 不适合 |
+| --- | --- | --- |
+| Retry | 短暂网络抖动、幂等读请求 | 非幂等写请求、确定性业务失败 |
+| CircuitBreaker | 下游持续失败时快速失败，保护调用方线程 | 替代限流或容量隔离 |
+| TimeLimiter | 给异步调用设置上限，避免请求无限等待 | 替代 HTTP client connect/read timeout |
+| RateLimiter | 控制入口或外部 API 调用速率 | 解决慢调用堆积，或跨实例全局限流 |
+| Bulkhead | 限制并发，避免某类调用拖垮整个服务 | 替代熔断、重试或线程池容量规划 |
+
+当前配置让 TimeLimiter 的 `1s` 小于 Feign read timeout 的 `3s`，因此 `slowCatalog=true` 会优先演示 Resilience4j 超时。RestClient 模式下如果 `demo.clients.catalog.read-timeout` 设置得更短，则 HTTP client 超时会先触发。
 
 ## OAuth2 Resource Server / JWT
 
@@ -506,6 +614,21 @@ curl -fsS 'http://localhost:9090/api/v1/query?query=orders_preview_fallback_tota
 
 curl -fsS 'http://localhost:9090/api/v1/query?query=catalog_product_simulated_failure_total' \
   | jq -r '.data.result[] | [.metric.application, .value[1]] | @tsv'
+
+curl -fsS 'http://localhost:9090/api/v1/query?query=resilience4j_retry_calls_total' \
+  | jq -r '.data.result[] | [.metric.name, .metric.kind, .value[1]] | @tsv'
+
+curl -fsS 'http://localhost:9090/api/v1/query?query=resilience4j_circuitbreaker_calls_seconds_count' \
+  | jq -r '.data.result[] | [.metric.name, .metric.kind, .value[1]] | @tsv'
+
+curl -fsS 'http://localhost:9090/api/v1/query?query=resilience4j_timelimiter_calls_total' \
+  | jq -r '.data.result[] | [.metric.name, .metric.kind, .value[1]] | @tsv'
+
+curl -fsS 'http://localhost:9090/api/v1/query?query=resilience4j_ratelimiter_available_permissions' \
+  | jq -r '.data.result[] | [.metric.name, .value[1]] | @tsv'
+
+curl -fsS 'http://localhost:9090/api/v1/query?query=resilience4j_bulkhead_available_concurrent_calls' \
+  | jq -r '.data.result[] | [.metric.name, .value[1]] | @tsv'
 ```
 
 查看 Docker 日志：

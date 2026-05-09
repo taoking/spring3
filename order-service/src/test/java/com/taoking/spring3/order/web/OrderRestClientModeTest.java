@@ -28,7 +28,8 @@ import org.springframework.test.context.DynamicPropertySource;
         "demo.clients.catalog.mode=restclient",
         "demo.clients.catalog.connect-timeout=100ms",
         "demo.clients.catalog.read-timeout=100ms",
-        "management.zipkin.tracing.export.enabled=false"
+        "management.zipkin.tracing.export.enabled=false",
+        "resilience4j.circuitbreaker.instances.catalog-service.minimum-number-of-calls=10"
 })
 class OrderRestClientModeTest {
 
@@ -83,12 +84,14 @@ class OrderRestClientModeTest {
 
     @Test
     void restClientModeUsesFallbackOnServerError() throws Exception {
-        catalogServer.enqueue(new MockResponse()
-                .setResponseCode(500)
-                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .setBody("""
-                        {"title":"Simulated catalog failure","status":500}
-                        """));
+        for (int i = 0; i < 3; i++) {
+            catalogServer.enqueue(new MockResponse()
+                    .setResponseCode(500)
+                    .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .setBody("""
+                            {"title":"Simulated catalog failure","status":500}
+                            """));
+        }
 
         ResponseEntity<OrderPreviewResponse> response = restTemplate
                 .withBasicAuth("user", "user123")
@@ -103,9 +106,11 @@ class OrderRestClientModeTest {
         assertThat(response.getBody().product().sku()).isEqualTo("SKU-RC-500");
         assertThat(response.getBody().fallbackUsed()).isTrue();
         assertThat(response.getBody().product().fallback()).isTrue();
-        RecordedRequest catalogRequest = catalogServer.takeRequest(1, TimeUnit.SECONDS);
-        assertThat(catalogRequest).isNotNull();
-        assertThat(catalogRequest.getPath()).isEqualTo("/api/catalog/products/SKU-RC-500?slow=false&fail=true");
+        for (int i = 0; i < 3; i++) {
+            RecordedRequest catalogRequest = catalogServer.takeRequest(1, TimeUnit.SECONDS);
+            assertThat(catalogRequest).isNotNull();
+            assertThat(catalogRequest.getPath()).isEqualTo("/api/catalog/products/SKU-RC-500?slow=false&fail=true");
+        }
     }
 
     @Test

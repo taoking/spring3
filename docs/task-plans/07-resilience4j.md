@@ -20,7 +20,7 @@
 
 ## 示例内容
 
-- `?slow=true` 触发 TimeLimiter。
+- `?slowCatalog=true` 触发 TimeLimiter。
 - `?failCatalog=true` 触发 Retry 和 CircuitBreaker。
 - 短时间高频请求触发 RateLimiter。
 - 并发请求超过阈值触发 Bulkhead。
@@ -44,3 +44,25 @@
 
 - 不接入生产流量控制平台。
 - 不把所有异常都吞掉后返回成功。
+
+## 实施记录
+
+- 已新增 `CatalogGovernanceService`，在 `OrderService` 和 `CatalogLookupService` 之间承载治理策略。
+- 已保留现有 Feign / RestClient fallback，并统一复用 `CatalogFallbackSupport` 返回明确降级商品。
+- 已新增 Retry + CircuitBreaker：`failCatalog=true` 会触发下游失败、重试和熔断指标。
+- 已新增 TimeLimiter：`slowCatalog=true` 走异步治理路径，`timeout-duration` 小于 Feign read timeout，优先演示 Resilience4j 超时。
+- 已新增 RateLimiter：`rateLimit=true` 连续调用可触发限流 fallback。
+- 已新增 Bulkhead：`bulkhead=true&holdBulkhead=true` 并发调用可触发 bulkhead full fallback。
+- 已新增 `demo.resilience.catalog.async-pool-size` 与 `demo.resilience.catalog.bulkhead-hold-duration` 配置。
+- 已新增 `OrderResilience4jTest`，覆盖 Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead，并验证 Prometheus 指标名称。
+- 已更新 `README.md`、`docs/USAGE.md`、`docs/IMPLEMENTATION.md`、`docs/interview-roadmap.md`。
+
+已验证：
+
+```bash
+./mvnw -pl order-service -am -Dtest=OrderResilience4jTest -Dsurefire.failIfNoSpecifiedTests=false test
+./mvnw -pl order-service -am test
+./mvnw test
+./mvnw -Pnacos test
+./mvnw package -DskipTests
+```

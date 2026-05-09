@@ -23,7 +23,7 @@ spring:
         config:
           catalog-service:
             connect-timeout: 500
-            read-timeout: 800
+            read-timeout: 3000
             logger-level: basic
 
 demo:
@@ -33,6 +33,10 @@ demo:
     demolog:
       enabled: true
       slow-threshold: 500ms
+  resilience:
+    catalog:
+      async-pool-size: 4
+      bulkhead-hold-duration: 1s
   order:
     currency: CNY
     notification-delay: PT0.1S
@@ -44,9 +48,16 @@ demo:
       username: user
       password: user123
       connect-timeout: 500ms
-      read-timeout: 800ms
+      read-timeout: 3s
 
 resilience4j:
+  retry:
+    instances:
+      catalog-service:
+        max-attempts: 3
+        wait-duration: 100ms
+        retry-exceptions:
+          - com.taoking.spring3.order.service.CatalogLookupFailedException
   circuitbreaker:
     instances:
       catalog-service:
@@ -58,6 +69,18 @@ resilience4j:
     instances:
       catalog-service:
         timeout-duration: 1s
+        cancel-running-future: true
+  ratelimiter:
+    instances:
+      catalog-rate-limit:
+        limit-for-period: 1
+        limit-refresh-period: 10s
+        timeout-duration: 0
+  bulkhead:
+    instances:
+      catalog-bulkhead:
+        max-concurrent-calls: 1
+        max-wait-duration: 0
 
 management:
   prometheus:

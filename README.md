@@ -65,7 +65,7 @@ curl -u user:user123 \
   http://localhost:8088/orders/api/orders/preview
 ```
 
-触发 Feign 降级：
+触发 catalog 降级：
 
 ```bash
 curl -u user:user123 \
@@ -111,7 +111,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Spring Security Basic 与 `@PreAuthorize`
 - OAuth2 Resource Server / JWT profile，支持 Bearer token、roles/scope 映射和方法级授权
 - OpenFeign 服务间调用，支持配置切换到 RestClient
-- Resilience4j 熔断降级
+- Resilience4j Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 与降级
 - Spring Cloud Gateway 路由、过滤器、认证透传、限流、fallback
 - Micrometer Tracing + Zipkin 链路追踪，日志输出 traceId/spanId
 - Caffeine 本地缓存
@@ -131,6 +131,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - HTTP client 选型：已补充 RestClient 调用模式、超时/认证/fallback 复用、测试覆盖和 OpenFeign / RestClient / WebClient / `@HttpExchange` 对比。
 - JWT 资源服务器：已补充 `jwt` profile、HS256 本地开发 token、`roles` claim 到 `ROLE_*` 映射、scope 支持和无 token/错 token/权限不足测试；默认 Basic Auth 不变。
 - 自定义 starter / autoconfigure：已新增 `demo-observability-autoconfigure` 和 `demo-observability-spring-boot-starter`，用 `@AutoConfiguration` 自动装配 `@DemoLog` AOP，并覆盖条件装配、属性绑定、禁用开关和用户 Bean 覆盖测试。
+- Resilience4j 深化：已补充 Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 触发参数、fallback 响应和 Prometheus 指标验证。
 
 ### 后续计划
 
@@ -144,7 +145,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - RestClient / `@HttpExchange`：已补充 RestClient 调用模式、统一 fallback、超时配置和选型对比；后续可补 `@HttpExchange` 声明式接口示例。
 - OAuth2 Resource Server / JWT：已完成 JWT profile、Bearer token 验证、角色映射和测试；后续可补对接真实 IdP、JWK Set 和 client_credentials 服务间 token。
 - 自动配置原理：已完成演示型 observability starter；后续可补源码阅读笔记和更多条件装配案例。
-- Resilience4j 深化：补充 Retry、RateLimiter、Bulkhead、TimeLimiter，说明不同治理策略边界。
+- Resilience4j 深化：已完成 Retry、RateLimiter、Bulkhead、TimeLimiter、CircuitBreaker 治理矩阵；后续可补更贴近生产的异常分类、舱壁线程池和告警规则。
 - Testcontainers / 集成测试：为 Nacos、Gateway 或外部组件补充可重复集成测试。
 
 #### P1：建议补充

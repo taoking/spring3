@@ -102,10 +102,22 @@ demo:
     catalog:
       mode: feign
       connect-timeout: 500ms
-      read-timeout: 800ms
+      read-timeout: 3s
 ```
 
 `CatalogLookupService` 会按模式选择实现，并把模式写入缓存 key，避免 Feign 与 RestClient 在同一进程内切换时复用错误缓存结果。
+
+### Resilience4j 服务治理
+
+`CatalogGovernanceService` 位于 `OrderService` 和 `CatalogLookupService` 之间，专门承载服务治理示例：
+
+- 默认失败路径使用同步 `@Retry(name = "catalog-service")` + `@CircuitBreaker(name = "catalog-service")`，`failCatalog=true` 时下游 fallback 结果会被治理层转换为 `CatalogLookupFailedException`，从而触发重试和熔断统计。
+- `slowCatalog=true` 使用异步 `@TimeLimiter(name = "catalog-service")`，由 `catalogGovernanceExecutor` 执行下游调用，并通过 Micrometer tracing 的 `CurrentTraceContext` 包装 executor，避免普通调用链的 trace 传播回退。
+- `rateLimit=true` 使用独立 `@RateLimiter(name = "catalog-rate-limit")`，便于本地快速复现限流。
+- `bulkhead=true&holdBulkhead=true` 使用独立 `@Bulkhead(name = "catalog-bulkhead")`，通过短暂持有舱壁稳定触发并发拒绝。
+- 所有治理 fallback 统一复用 `CatalogFallbackSupport`，响应体中的 `fallback=true` 与 `fallbackUsed=true` 会明确告诉调用方发生了降级。
+
+配置集中在 `order-service/src/main/resources/application.yml` 的 `resilience4j.*` 和 `demo.resilience.catalog.*` 下。当前 TimeLimiter 为 `1s`，Feign read timeout 为 `3s`，因此慢调用演示优先由 Resilience4j 截断；如果 HTTP client timeout 更短，则会先走 client timeout。
 
 ### JWT profile
 
@@ -225,6 +237,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `order-service` 覆盖 health 公开访问、业务认证、参数校验、Feign 正常调用、Feign 失败降级、admin 权限、Prometheus endpoint。
 - `order-service` 增加 W3C `traceparent` 传播测试，验证 Feign 出站请求携带同一个 traceId。
 - `order-service` 增加 RestClient 模式测试，覆盖正常调用、Basic Auth 出站、500 fallback 和读超时 fallback。
+- `order-service` 增加 Resilience4j 集成测试，覆盖 Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 触发方式，并验证 Prometheus 暴露对应指标。
 - `order-service` 增加 JWT profile 测试，覆盖无 token、错误 token、普通用户 token、管理员 token，并验证服务间调用仍使用 Basic。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - Feign 测试使用 MockWebServer，不依赖公网和手动启动 provider。

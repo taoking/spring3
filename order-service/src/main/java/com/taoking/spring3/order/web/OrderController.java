@@ -37,9 +37,12 @@ class OrderController {
     OrderPreviewResponse preview(
             @Valid @RequestBody OrderPreviewRequest request,
             @RequestParam(defaultValue = "false") boolean slowCatalog,
-            @RequestParam(defaultValue = "false") boolean failCatalog
+            @RequestParam(defaultValue = "false") boolean failCatalog,
+            @RequestParam(defaultValue = "false") boolean rateLimit,
+            @RequestParam(defaultValue = "false") boolean bulkhead,
+            @RequestParam(defaultValue = "false") boolean holdBulkhead
     ) {
-        return orderService.preview(request, slowCatalog, failCatalog);
+        return orderService.preview(request, slowCatalog, failCatalog, rateLimit, bulkhead, holdBulkhead);
     }
 
     @GetMapping("/admin/stats")
