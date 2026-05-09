@@ -4,6 +4,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -21,5 +22,21 @@ class OpenApiConfig {
                         .type(SecurityScheme.Type.HTTP)
                         .scheme("basic"))
                 .addSecurityItem(new SecurityRequirement().addList("basicAuth"));
+    }
+
+    @Bean
+    GroupedOpenApi catalogPublicApiGroup() {
+        return GroupedOpenApi.builder()
+                .group("catalog-public")
+                .pathsToMatch("/api/catalog/products/**")
+                .build();
+    }
+
+    @Bean
+    GroupedOpenApi catalogAdminApiGroup() {
+        return GroupedOpenApi.builder()
+                .group("catalog-admin")
+                .pathsToMatch("/api/catalog/admin/**")
+                .build();
     }
 }

@@ -1,5 +1,6 @@
 package com.taoking.spring3.order.web;
 
+import com.taoking.spring3.common.api.ApiHeaders;
 import com.taoking.spring3.common.dto.OrderPreviewRequest;
 import com.taoking.spring3.common.dto.OrderPreviewResponse;
 import com.taoking.spring3.order.config.CatalogClientProperties;
@@ -7,6 +8,7 @@ import com.taoking.spring3.order.config.OrderProperties;
 import com.taoking.spring3.order.service.OrderService;
 import com.taoking.spring3.order.service.ThreadProbeResponse;
 import com.taoking.spring3.order.service.ThreadProbeService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -25,6 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 class OrderController {
 
+    static final String LEGACY_PREVIEW_SUNSET = "Thu, 31 Dec 2026 23:59:59 GMT";
+
     private final OrderService orderService;
     private final ThreadProbeService threadProbeService;
     private final OrderProperties orderProperties;
@@ -42,6 +46,7 @@ class OrderController {
         this.catalogClientProperties = catalogClientProperties;
     }
 
+    @Deprecated(since = "0.0.1", forRemoval = false)
     @PostMapping("/preview")
     OrderPreviewResponse preview(
             @Valid @RequestBody OrderPreviewRequest request,
@@ -51,8 +56,10 @@ class OrderController {
             @RequestParam(defaultValue = "false") boolean bulkhead,
             @RequestParam(defaultValue = "false") boolean holdBulkhead,
             @RequestParam(defaultValue = "false") boolean sentinelFlow,
-            @RequestParam(defaultValue = "false") boolean sentinelHotSku
+            @RequestParam(defaultValue = "false") boolean sentinelHotSku,
+            HttpServletResponse response
     ) {
+        addLegacyDeprecationHeaders(response);
         return orderService.preview(
                 request,
                 slowCatalog,
@@ -63,6 +70,13 @@ class OrderController {
                 sentinelFlow,
                 sentinelHotSku
         );
+    }
+
+    private void addLegacyDeprecationHeaders(HttpServletResponse response) {
+        response.setHeader(ApiHeaders.DEPRECATION, "true");
+        response.setHeader(ApiHeaders.SUNSET, LEGACY_PREVIEW_SUNSET);
+        response.setHeader("Link", "</api/v1/orders/preview>; rel=\"successor-version\"");
+        response.setHeader("X-API-Deprecated-Reason", "Use /api/v1/orders/preview or /api/v2/orders/preview");
     }
 
     @GetMapping("/thread-probe")

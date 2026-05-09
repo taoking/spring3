@@ -26,6 +26,7 @@
 - `order-service` 可以通过 `virtual-thread` profile 启用 Java 21 虚拟线程，并保留默认 profile 的传统线程池。
 - `order-service` 可以通过 `-Psentinel` + `sentinel` profile 启用 Sentinel 本地规则，演示限流、热点参数和慢调用熔断。
 - 三个服务可以通过 `json-logging` profile 输出 JSON 日志，Servlet 服务请求日志包含 requestId、traceId、spanId、status、elapsedMs，并验证敏感认证头不会原样输出。
+- 错误响应包含稳定 `errorCode`、`requestId`、`timestamp`，订单服务同时提供 `/api/v1/orders/preview` 和 `/api/v2/orders/preview` 示例，旧 `/api/orders/preview` 返回废弃提示响应头。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 项目没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
@@ -34,7 +35,7 @@
 
 ### 工程结构
 
-- `common`：共享 DTO、自定义 AOP 注解。
+- `common`：共享 DTO、自定义 AOP 注解、API 错误码和通用响应头常量。
 - `demo-observability-autoconfigure`：`@DemoLog` 自动配置、属性绑定、默认 reporter、切面 Bean。
 - `demo-observability-spring-boot-starter`：依赖聚合模块，不包含业务代码。
 - `catalog-service`：商品 provider，端口 `8081`。
@@ -46,7 +47,7 @@
 - Web MVC：`@RestController`、`@RequestMapping`、`@GetMapping`、`@PostMapping`、`@RequestParam`、`@PathVariable`、`@RequestBody`。
 - 参数校验：Jakarta Validation、`@Valid`、`@Validated`、`@NotBlank`、`@Positive`。
 - 配置绑定：`@ConfigurationProperties`、YAML 配置。
-- 错误处理：`@RestControllerAdvice`、`@ExceptionHandler`、Spring Boot 3 `ProblemDetail`。
+- 错误处理：`@RestControllerAdvice`、`@ExceptionHandler`、Spring Boot 3 `ProblemDetail`、稳定错误码、请求 ID 和时间戳扩展字段。
 - 安全：Spring Security Basic、`@PreAuthorize`、公开 health/prometheus/swagger。
 - JWT：`jwt` profile 下启用 OAuth2 Resource Server，HS256 本地开发密钥验证 Bearer token，`roles` claim 映射到 `ROLE_*`，`scope` claim 映射到 `SCOPE_*`。
 - 服务调用：OpenFeign、RestClient、服务间 Basic Auth、超时配置、调用模式配置切换。
@@ -60,7 +61,7 @@
 - Trace 传播：Web MVC/WebFlux 入口自动生成或接收 W3C trace context，`order-service` 的 Feign 配置把当前 trace context 注入出站请求。
 - 结构化日志：`json-logging` profile 使用 Spring Boot 3.5 内建 structured logging 输出 logstash JSON，Servlet 请求日志由 observability starter 自动配置。
 - 错误上报：Sentry Jakarta starter，DSN 通过环境变量读取。
-- API 文档：SpringDoc OpenAPI / Swagger UI。
+- API 文档：SpringDoc OpenAPI / Swagger UI，按订单版本和 Catalog public/admin 分组。
 - 集成测试：`integration-test` Maven profile 使用 Failsafe 运行 `**/*IT.java`，当前通过 Testcontainers 启动固定版本 Nginx 容器验证 Gateway 真实下游。
 - CI：GitHub Actions 使用 JDK 21 和 Maven cache，默认 job 运行 `./mvnw -B test`，Docker job 运行 `./mvnw -B -Pintegration-test verify`。
 - 容器化：`catalog-service/Dockerfile` 和 `order-service/Dockerfile` 使用 JDK 21 JRE Alpine 镜像、非 root 用户和 `JAVA_OPTS`；`deployment/docker-compose.yml` 启动两个业务服务、Prometheus、Grafana、Zipkin。
@@ -70,6 +71,7 @@
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
 - Sentinel 可选专题：通过 `-Psentinel` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=sentinel` 加载本地 Flow、ParamFlow、Degrade 规则。
 - JSON 日志专题：`json-logging` profile 开启 `logging.structured.format.console=logstash` 和 `demo.observability.http-logging.enabled=true`。
+- API 治理专题：`common` 维护错误码常量，两个 Servlet 服务的 `ProblemDetail` 统一补充 `errorCode`、`requestId`、`timestamp`，订单服务提供 v1/v2 版本路由和旧路径废弃头。
 
 ### 自定义 starter / autoconfigure
 
@@ -106,6 +108,7 @@ demo:
 - 用户自定义 `DemoLogAspect` 时默认 aspect 退让。
 - 服务模块引入 starter 后，原 `@DemoLog` 行为保持。
 - `OrderJsonLoggingProfileTest` 覆盖 `json-logging` profile、`X-Request-Id` 响应头、JSON 请求日志字段和敏感认证头脱敏。
+- `CatalogControllerTest` 和 `OrderControllerTest` 覆盖稳定错误码、`X-Request-Id` 回写、版本路由、旧接口废弃头和 OpenAPI 分组。
 
 ### HTTP client 模式
 
@@ -276,10 +279,10 @@ docker compose -f platform/nacos/docker-compose.yml config
 
 ## 测试策略
 
-- `catalog-service` 覆盖 health/prometheus 公开访问、业务认证、商品查询、404 ProblemDetail、admin 权限。
+- `catalog-service` 覆盖 health/prometheus 公开访问、业务认证、商品查询、404 ProblemDetail、稳定错误码、requestId 回写、OpenAPI 分组、admin 权限。
 - `catalog-service` 增加 JWT profile 测试，覆盖无 token、错误 token、普通用户 token、管理员 token，以及 JWT 模式下 Basic 服务凭证仍可用于内部调用。
 - `demo-observability-autoconfigure` 使用 `ApplicationContextRunner` 覆盖自动配置默认生效、关闭配置、用户 Bean 覆盖和 AOP 事件上报。
-- `order-service` 覆盖 health 公开访问、业务认证、参数校验、Feign 正常调用、Feign 失败降级、admin 权限、Prometheus endpoint。
+- `order-service` 覆盖 health 公开访问、业务认证、参数校验、稳定错误码、旧接口废弃头、v1/v2 版本路由、OpenAPI 分组、Feign 正常调用、Feign 失败降级、admin 权限、Prometheus endpoint。
 - `order-service` 增加 W3C `traceparent` 传播测试，验证 Feign 出站请求携带同一个 traceId。
 - `order-service` 增加 RestClient 模式测试，覆盖正常调用、Basic Auth 出站、500 fallback 和读超时 fallback。
 - `order-service` 增加 Resilience4j 集成测试，覆盖 Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 触发方式，并验证 Prometheus 暴露对应指标。

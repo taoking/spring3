@@ -6,9 +6,12 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.taoking.spring3.common.api.ApiErrorCodes;
+import com.taoking.spring3.common.api.ApiHeaders;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -53,9 +56,14 @@ class CatalogControllerTest {
     @Test
     void missingProductUsesProblemDetail() throws Exception {
         mockMvc.perform(get("/api/catalog/products/UNKNOWN")
-                        .with(httpBasic("user", "user123")))
+                        .with(httpBasic("user", "user123"))
+                        .header(ApiHeaders.REQUEST_ID, "catalog-missing-request"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.title").value("Product not found"));
+                .andExpect(header().string(ApiHeaders.REQUEST_ID, "catalog-missing-request"))
+                .andExpect(jsonPath("$.title").value("Product not found"))
+                .andExpect(jsonPath("$.errorCode").value(ApiErrorCodes.CATALOG_PRODUCT_NOT_FOUND))
+                .andExpect(jsonPath("$.requestId").value("catalog-missing-request"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     @Test
@@ -77,6 +85,17 @@ class CatalogControllerTest {
                         .with(httpBasic("user", "user123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(3)));
+    }
+
+    @Test
+    void openApiDocsExposeCatalogGroups() throws Exception {
+        mockMvc.perform(get("/v3/api-docs/catalog-public"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/api/catalog/products")));
+
+        mockMvc.perform(get("/v3/api-docs/catalog-admin"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/api/catalog/admin/stats")));
     }
 
     @Test

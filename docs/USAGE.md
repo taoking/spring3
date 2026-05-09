@@ -1092,6 +1092,124 @@ SPRING_PROFILES_ACTIVE=json-logging ./mvnw -pl order-service spring-boot:run 2>&
 ./mvnw -pl order-service -am -Dtest=OrderJsonLoggingProfileTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
+## API 治理
+
+当前项目用少量代码演示资深面试常见的接口治理点：稳定错误码、请求关联 ID、API versioning、接口废弃策略和 OpenAPI 分组。
+
+### 统一错误响应
+
+两个 Servlet 服务的 `ProblemDetail` 都会扩展以下字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `errorCode` | 稳定错误码，不随错误文案变化 |
+| `requestId` | 优先使用入站 `X-Request-Id`，没有则生成 UUID，并写回响应头 |
+| `timestamp` | UTC 时间戳，用于排障对齐日志 |
+| `path` | 当前请求路径 |
+
+当前错误码示例：
+
+| 错误码 | 场景 |
+| --- | --- |
+| `ORDER_VALIDATION_FAILED` | 订单请求参数校验失败 |
+| `ORDER_SENTINEL_BLOCKED` | Sentinel 流控或熔断拦截 |
+| `CATALOG_PRODUCT_NOT_FOUND` | 商品不存在 |
+| `CATALOG_VALIDATION_FAILED` | Catalog 请求参数校验失败 |
+| `CATALOG_SIMULATED_FAILURE` | Catalog 演示异常 |
+| `SECURITY_ACCESS_DENIED` | 已认证但权限不足 |
+| `SYSTEM_INTERNAL_ERROR` | 未预期服务端异常 |
+
+验证错误码和 requestId：
+
+```bash
+curl -i -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -H 'X-Request-Id: demo-error-1' \
+  -d '{"sku":"","quantity":0}' \
+  http://localhost:8080/api/orders/preview
+```
+
+预期响应头包含 `X-Request-Id: demo-error-1`，响应体包含 `errorCode=ORDER_VALIDATION_FAILED`、`requestId=demo-error-1` 和 `timestamp`。
+
+### 版本路由
+
+旧接口仍可用：
+
+```bash
+curl -i -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":1}' \
+  http://localhost:8080/api/orders/preview
+```
+
+旧接口会返回以下废弃提示：
+
+| Header | 值 |
+| --- | --- |
+| `Deprecation` | `true` |
+| `Sunset` | `Thu, 31 Dec 2026 23:59:59 GMT` |
+| `Link` | `</api/v1/orders/preview>; rel="successor-version"` |
+| `X-API-Deprecated-Reason` | 迁移到 `/api/v1/orders/preview` 或 `/api/v2/orders/preview` |
+
+推荐新调用方使用 v1：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":1}' \
+  http://localhost:8080/api/v1/orders/preview
+```
+
+v2 演示轻量响应结构变化，不复制业务逻辑：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":1}' \
+  http://localhost:8080/api/v2/orders/preview
+```
+
+v2 响应把原订单预览放在 `data` 字段下，并增加 `apiVersion=v2` 和 `links.previous`。
+
+兼容策略：
+
+- 新增字段保持向后兼容，优先加在 v1 响应里。
+- 破坏性响应结构变化放到 v2。
+- 旧路径进入废弃期后保留明确的 `Deprecation`、`Sunset` 和 successor link。
+- 错误码是客户端契约，不能因为错误文案调整而变更。
+
+### OpenAPI 分组
+
+订单服务：
+
+| 分组 | 地址 |
+| --- | --- |
+| 默认 | `http://localhost:8080/v3/api-docs` |
+| `orders-v1` | `http://localhost:8080/v3/api-docs/orders-v1` |
+| `orders-v2` | `http://localhost:8080/v3/api-docs/orders-v2` |
+| `orders-ops` | `http://localhost:8080/v3/api-docs/orders-ops` |
+
+Catalog 服务：
+
+| 分组 | 地址 |
+| --- | --- |
+| 默认 | `http://localhost:8081/v3/api-docs` |
+| `catalog-public` | `http://localhost:8081/v3/api-docs/catalog-public` |
+| `catalog-admin` | `http://localhost:8081/v3/api-docs/catalog-admin` |
+
+Swagger UI：
+
+```bash
+open http://localhost:8080/swagger-ui.html
+open http://localhost:8081/swagger-ui.html
+```
+
+自动化验证：
+
+```bash
+./mvnw -pl catalog-service,order-service -am -Dtest=CatalogControllerTest,OrderControllerTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
 ## Nacos
 
 Nacos 是可选专题，默认 profile 不依赖 Nacos。只有同时使用 Maven `-Pnacos` 和 Spring `SPRING_PROFILES_ACTIVE=nacos` 时才启用 Nacos。
