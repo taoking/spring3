@@ -21,6 +21,8 @@
 - 设置 `SENTRY_DSN` 后，调用异常触发接口能在 Sentry 看到事件。
 - `integration-test` profile 可以通过 Testcontainers 验证 Gateway 到容器化下游的真实路由。
 - GitHub Actions 分别执行默认单元测试和 Docker 集成测试。
+- `catalog-service` 和 `order-service` 镜像可以构建，并能通过本地 Compose 在容器网络中完成服务间调用。
+- 容器版 Prometheus 可以通过服务名抓取业务服务指标。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 项目没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
@@ -57,6 +59,8 @@
 - API 文档：SpringDoc OpenAPI / Swagger UI。
 - 集成测试：`integration-test` Maven profile 使用 Failsafe 运行 `**/*IT.java`，当前通过 Testcontainers 启动固定版本 Nginx 容器验证 Gateway 真实下游。
 - CI：GitHub Actions 使用 JDK 21 和 Maven cache，默认 job 运行 `./mvnw -B test`，Docker job 运行 `./mvnw -B -Pintegration-test verify`。
+- 容器化：`catalog-service/Dockerfile` 和 `order-service/Dockerfile` 使用 JDK 21 JRE Alpine 镜像、非 root 用户和 `JAVA_OPTS`；`deployment/docker-compose.yml` 启动两个业务服务、Prometheus、Grafana、Zipkin。
+- 容器网络：`order-service` 在 Compose 中通过 `DEMO_CLIENTS_CATALOG_BASE_URL=http://catalog-service:8081` 调用 `catalog-service`，Prometheus 通过 `catalog-service:8081` 和 `order-service:8080` 抓取指标。
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
 
 ### 自定义 starter / autoconfigure
@@ -149,6 +153,8 @@ demo:
 ```bash
 ./mvnw test
 ./mvnw -Pintegration-test verify
+./mvnw package -DskipTests
+docker compose -f deployment/docker-compose.yml up -d
 ./mvnw -pl catalog-service spring-boot:run
 ./mvnw -pl order-service spring-boot:run
 ./mvnw -pl gateway-service spring-boot:run
@@ -247,6 +253,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - `gateway-service` 增加 Testcontainers 集成测试，使用 `nginx:1.27.3-alpine` 作为容器化下游，覆盖真实 Gateway 路由到外部依赖的路径。
 - `.github/workflows/ci.yml` 包含 `unit-tests` 和 `integration-tests` 两个 job，分别覆盖默认测试和 Docker 集成测试。
+- `deployment/docker-compose.yml` 使用 Actuator readiness 作为容器 healthcheck，验证本地容器化部署链路。
 - Feign 测试使用 MockWebServer，不依赖公网和手动启动 provider。
 
 ## 明确不做

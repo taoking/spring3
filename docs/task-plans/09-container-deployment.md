@@ -43,3 +43,35 @@
 
 - 不推送镜像到远程 registry。
 - 不引入 Kubernetes 作为本任务范围。
+
+## 实施记录
+
+- 已新增 `catalog-service/Dockerfile` 和 `order-service/Dockerfile`，使用 JDK 21 JRE Alpine、非 root 用户、`JAVA_OPTS` 和模块内 jar 构建镜像。
+- 已新增两个模块的 `.dockerignore`，镜像上下文只包含 Dockerfile 和目标 jar，避免带入本地日志或多余构建产物。
+- 已在 `catalog-service`、`order-service` 中配置 `server.shutdown` 和 `spring.lifecycle.timeout-per-shutdown-phase`，支持优雅停机。
+- 已新增 `deployment/docker-compose.yml`，启动 `catalog-service`、`order-service`、Prometheus、Grafana、Zipkin。
+- 已新增 `deployment/prometheus/prometheus.yml`，Prometheus 在容器网络中通过 `catalog-service:8081` 和 `order-service:8080` 抓取指标。
+- 已更新 `README.md`、`docs/USAGE.md`、`docs/IMPLEMENTATION.md`、`docs/interview-roadmap.md`。
+
+已验证：
+
+```bash
+./mvnw package -DskipTests
+docker compose -f deployment/docker-compose.yml config
+docker compose -f deployment/docker-compose.yml build
+docker compose -f deployment/docker-compose.yml up -d
+curl -u user:user123 -H 'Content-Type: application/json' -d '{"sku":"SKU-1001","quantity":2}' http://localhost:8080/api/orders/preview
+curl -fsS 'http://localhost:9090/api/v1/query?query=up'
+docker compose -f deployment/docker-compose.yml down
+./mvnw test
+./mvnw -Pnacos test
+```
+
+验证结果：
+
+- 两个业务服务镜像均构建成功：`spring3/catalog-service:local`、`spring3/order-service:local`。
+- Compose 启动后 `catalog-service`、`order-service` healthcheck 均为 `healthy`。
+- readiness/liveness endpoint 均返回 `{"status":"UP"}`。
+- 订单预览接口返回 `fallbackUsed=false`，日志显示 Feign 调用 `http://catalog-service:8081`。
+- Prometheus active targets 为 `catalog-service:8081`、`order-service:8080`，查询 `up` 均为 `1`。
+- `docker compose down` 已移除容器和 `spring3-deployment_default` 网络。

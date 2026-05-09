@@ -141,6 +141,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - 自定义 starter / autoconfigure：已新增 `demo-observability-autoconfigure` 和 `demo-observability-spring-boot-starter`，用 `@AutoConfiguration` 自动装配 `@DemoLog` AOP，并覆盖条件装配、属性绑定、禁用开关和用户 Bean 覆盖测试。
 - Resilience4j 深化：已补充 Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 触发参数、fallback 响应和 Prometheus 指标验证。
 - Testcontainers / CI：已新增 GitHub Actions workflow，默认跑 `./mvnw test`，Docker job 跑 `./mvnw -Pintegration-test verify`；Gateway 集成测试使用固定版本 Nginx 容器验证真实下游路由。
+- Docker 镜像与部署：已新增 `catalog-service`、`order-service` Dockerfile 和 `deployment/docker-compose.yml`，容器网络内使用服务名调用，并提供 Prometheus 服务名抓取配置。
 
 ### 后续计划
 
@@ -159,7 +160,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 
 #### P1：建议补充
 
-- Docker 镜像与部署：补充 Dockerfile 或 Spring Boot build image、优雅停机、readiness/liveness 探针。
+- Docker 镜像与部署：已完成两个业务服务镜像、应用 Compose、readiness/liveness、优雅停机、JVM 参数和容器网络 Prometheus；后续可补镜像 SBOM 和 registry 发布流程。
 - Java 21 虚拟线程：增加 `virtual-thread` profile，对比传统线程池和 `@Async`。
 - Sentinel：作为阿里系专题补充，和 Resilience4j 对比限流、熔断、热点参数。
 - 结构化日志：补充 JSON log、MDC、traceId、错误码和请求日志脱敏。

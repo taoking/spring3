@@ -44,6 +44,8 @@
 | `gateway-service/src/main/resources/application-nacos.yml` | 网关 Nacos 服务发现路由 |
 | `observability/docker-compose.yml` | Prometheus + Grafana + Zipkin |
 | `observability/prometheus/prometheus.yml` | Prometheus 抓取目标 |
+| `deployment/docker-compose.yml` | 应用容器 + Prometheus + Grafana + Zipkin 一体化本地部署 |
+| `deployment/prometheus/prometheus.yml` | 容器网络内按服务名抓取业务服务指标 |
 | `platform/nacos/docker-compose.yml` | 本地 Nacos 3.0.3 |
 
 常用环境变量：
@@ -58,6 +60,9 @@
 | `ZIPKIN_ENDPOINT` | Zipkin span 上报地址 | `http://localhost:9411/api/v2/spans` |
 | `DEMO_CLIENTS_CATALOG_MODE` | order-service 调用 catalog-service 的 HTTP client 模式：`feign` 或 `restclient` | `feign` |
 | `DEMO_SECURITY_JWT_SECRET` | `jwt` profile 下本地 HS256 测试 token 密钥，至少 32 字节 | `spring3-local-dev-secret-key-32-bytes-minimum` |
+| `JAVA_OPTS` | 容器内 JVM 参数，例如内存比例和 OOM 退出策略 | `-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError` |
+| `SERVER_SHUTDOWN` | Spring Boot 优雅停机开关 | `graceful` |
+| `SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE` | 优雅停机每阶段等待时间 | `20s` |
 
 ## 构建与测试
 
@@ -99,6 +104,91 @@ GitHub Actions：
 
 ```bash
 ./mvnw clean
+```
+
+## Docker 镜像与应用 Compose
+
+先构建 Spring Boot jar：
+
+```bash
+./mvnw package -DskipTests
+```
+
+单独构建业务服务镜像：
+
+```bash
+docker build -t spring3/catalog-service:local ./catalog-service
+docker build -t spring3/order-service:local ./order-service
+```
+
+也可以由 Compose 统一构建：
+
+```bash
+docker compose -f deployment/docker-compose.yml build
+```
+
+启动两个业务服务和观测组件：
+
+```bash
+docker compose -f deployment/docker-compose.yml up -d
+```
+
+查看容器状态和日志：
+
+```bash
+docker compose -f deployment/docker-compose.yml ps
+docker compose -f deployment/docker-compose.yml logs -f catalog-service
+docker compose -f deployment/docker-compose.yml logs -f order-service
+docker compose -f deployment/docker-compose.yml logs -f prometheus
+```
+
+健康检查和探针：
+
+```bash
+curl -fsS http://localhost:8081/actuator/health/readiness
+curl -fsS http://localhost:8081/actuator/health/liveness
+curl -fsS http://localhost:8080/actuator/health/readiness
+curl -fsS http://localhost:8080/actuator/health/liveness
+```
+
+验证容器网络内的 `order-service -> catalog-service` 调用：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-1001","quantity":2}' \
+  http://localhost:8080/api/orders/preview
+```
+
+`deployment/docker-compose.yml` 通过环境变量把 `DEMO_CLIENTS_CATALOG_BASE_URL` 设置为 `http://catalog-service:8081`，容器内服务间调用不依赖 `host.docker.internal`。
+
+查看 Prometheus targets，预期 `catalog-service` 和 `order-service` 都是 `up`：
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/targets?state=active' \
+  | jq -r '.data.activeTargets[] | [.labels.job, .health, .scrapeUrl, (.lastError // "")] | @tsv'
+```
+
+查询 `up`：
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/query?query=up' \
+  | jq -r '.data.result[] | [.metric.job, .metric.instance, .value[1]] | @tsv'
+```
+
+停止并清理容器和网络：
+
+```bash
+docker compose -f deployment/docker-compose.yml down
+```
+
+排障命令：
+
+```bash
+docker compose -f deployment/docker-compose.yml config
+docker compose -f deployment/docker-compose.yml ps
+docker inspect spring3-app-order --format '{{json .State.Health}}'
+docker compose -f deployment/docker-compose.yml logs --tail=200 order-service
 ```
 
 ## 自定义 Starter / Autoconfigure
@@ -886,6 +976,7 @@ screen -S spring3-gateway -X quit
 停止 Docker 服务：
 
 ```bash
+docker compose -f deployment/docker-compose.yml down
 docker compose -f observability/docker-compose.yml down
 docker compose -f platform/nacos/docker-compose.yml down
 ```

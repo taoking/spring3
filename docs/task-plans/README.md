@@ -21,7 +21,7 @@
 | 6 | 自定义 starter / autoconfigure（基线已完成） | [06-autoconfigure-starter.md](06-autoconfigure-starter.md) | P0 |
 | 7 | Resilience4j 深化（基线已完成） | [07-resilience4j.md](07-resilience4j.md) | P0 |
 | 8 | Testcontainers / CI（基线已完成） | [08-testcontainers-ci.md](08-testcontainers-ci.md) | P0 |
-| 9 | Docker 镜像与部署 | [09-container-deployment.md](09-container-deployment.md) | P1 |
+| 9 | Docker 镜像与部署（基线已完成） | [09-container-deployment.md](09-container-deployment.md) | P1 |
 | 10 | Java 21 虚拟线程 | [10-virtual-threads.md](10-virtual-threads.md) | P1 |
 | 11 | Sentinel | [11-sentinel.md](11-sentinel.md) | P1 |
 | 12 | 结构化日志 | [12-structured-logging.md](12-structured-logging.md) | P1 |

@@ -1,0 +1,90 @@
+name: spring3-deployment
+
+services:
+  catalog-service:
+    build:
+      context: ../catalog-service
+    image: spring3/catalog-service:local
+    container_name: spring3-app-catalog
+    ports:
+      - "8081:8081"
+    environment:
+      APP_ENV: docker
+      SERVER_SHUTDOWN: graceful
+      SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 20s
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      JAVA_OPTS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8081/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 30s
+    depends_on:
+      - zipkin
+
+  order-service:
+    build:
+      context: ../order-service
+    image: spring3/order-service:local
+    container_name: spring3-app-order
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ENV: docker
+      SERVER_SHUTDOWN: graceful
+      SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE: 20s
+      DEMO_CLIENTS_CATALOG_BASE_URL: http://catalog-service:8081
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      JAVA_OPTS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 30s
+    depends_on:
+      catalog-service:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
+
+  zipkin:
+    image: openzipkin/zipkin:3.5.1
+    container_name: spring3-app-zipkin
+    ports:
+      - "9411:9411"
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: spring3-app-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      catalog-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana-oss:12.1.1
+    container_name: spring3-app-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus

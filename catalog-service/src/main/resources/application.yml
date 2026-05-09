@@ -1,9 +1,12 @@
 server:
   port: 8081
+  shutdown: ${SERVER_SHUTDOWN:graceful}
 
 spring:
   application:
     name: catalog-service
+  lifecycle:
+    timeout-per-shutdown-phase: ${SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE:20s}
   cloud:
     nacos:
       config:

@@ -1,9 +1,12 @@
 server:
   port: 8080
+  shutdown: ${SERVER_SHUTDOWN:graceful}
 
 spring:
   application:
     name: order-service
+  lifecycle:
+    timeout-per-shutdown-phase: ${SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE:20s}
   cache:
     type: caffeine
     caffeine:
