@@ -30,6 +30,7 @@
 | 15 | 消息队列（RabbitMQ 基线已完成） | [15-messaging.md](15-messaging.md) | P2 |
 | 16 | Native Image / AOT（文档和 catalog AOT 基线已完成） | [16-native-aot.md](16-native-aot.md) | P2 |
 | 17 | Kubernetes（最小 YAML 基线已完成） | [17-kubernetes.md](17-kubernetes.md) | P2 |
+| 18 | Kafka 专题（基线已完成） | [18-kafka.md](18-kafka.md) | P2 |
 
 ## 通用执行约束
 

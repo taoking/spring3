@@ -19,7 +19,7 @@
 - Zipkin 可以查询一次 `gateway-service -> order-service -> catalog-service` 请求的 trace。
 - `order-service` 和 `catalog-service` 日志可以看到同一个 traceId。
 - 设置 `SENTRY_DSN` 后，调用异常触发接口能在 Sentry 看到事件。
-- `integration-test` profile 可以通过 Testcontainers 验证 Gateway 到容器化下游的真实路由；配合 `-Prabbitmq` 时可以验证 RabbitMQ 消息链路。
+- `integration-test` profile 可以通过 Testcontainers 验证 Gateway 到容器化下游的真实路由；配合 `-Prabbitmq` 或 `-Pkafka` 时可以验证对应消息链路。
 - GitHub Actions 分别执行默认单元测试和 Docker 集成测试。
 - `catalog-service` 和 `order-service` 镜像可以构建，并能通过本地 Compose 在容器网络中完成服务间调用。
 - 容器版 Prometheus 可以通过服务名抓取业务服务指标。
@@ -29,10 +29,11 @@
 - 错误响应包含稳定 `errorCode`、`requestId`、`timestamp`，订单服务同时提供 `/api/v1/orders/preview` 和 `/api/v2/orders/preview` 示例，旧 `/api/orders/preview` 返回废弃提示响应头。
 - `catalog-service` 可以通过 Spring Cloud Contract 生成 provider 验证测试和本地 `stubs` jar，`order-service` 可以使用 Stub Runner 消费 stubs 验证服务间契约。
 - `order-service` 可以通过 `-Prabbitmq` + `rabbitmq` profile 启用 RabbitMQ 订单预览事件示例，覆盖生产、消费、eventId 幂等、重试和死信队列。
+- `order-service` 可以通过 `-Pkafka` + `kafka` profile 启用 Kafka 订单预览事件示例，覆盖生产、消费、message key 分区顺序、manual ack、eventId 幂等、重试和 DLT。
 - `catalog-service` 可以完成 Spring AOT 处理，Native Image / AOT 构建命令、兼容注意事项和失败排查已文档化；native binary 编译不进入默认 CI。
 - `catalog-service` 和 `order-service` 有 Kubernetes 最小部署 YAML，覆盖 Deployment、Service、ConfigMap、Secret 示例、Actuator readiness/liveness、资源 requests/limits、滚动发布和优雅停机。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
-- 默认 profile 没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖；RabbitMQ 仅作为隔离的可选 profile。
+- 默认 profile 没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖；RabbitMQ 和 Kafka 仅作为隔离的可选 profile。
 - `@DemoLog` AOP 能通过自定义 starter 自动装配，并允许关闭或覆盖默认 Bean。
 
 ## 当前实现
@@ -66,8 +67,8 @@
 - 结构化日志：`json-logging` profile 使用 Spring Boot 3.5 内建 structured logging 输出 logstash JSON，Servlet 请求日志由 observability starter 自动配置。
 - 错误上报：Sentry Jakarta starter，DSN 通过环境变量读取。
 - API 文档：SpringDoc OpenAPI / Swagger UI，按订单版本和 Catalog public/admin 分组。
-- 集成测试：`integration-test` Maven profile 使用 Failsafe 运行 `**/*IT.java`，当前通过 Testcontainers 启动固定版本 Nginx 容器验证 Gateway 真实下游，并在 `-Prabbitmq` 下启动固定版本 RabbitMQ 容器验证消息链路。
-- CI：GitHub Actions 使用 JDK 21 和 Maven cache，默认 job 运行 `./mvnw -B test`，Docker job 运行 `./mvnw -B -Pintegration-test verify` 和 RabbitMQ IT 命令。
+- 集成测试：`integration-test` Maven profile 使用 Failsafe 运行 `**/*IT.java`，当前通过 Testcontainers 启动固定版本 Nginx 容器验证 Gateway 真实下游，并在 `-Prabbitmq`/`-Pkafka` 下启动固定版本 RabbitMQ/Kafka 容器验证消息链路。
+- CI：GitHub Actions 使用 JDK 21 和 Maven cache，默认 job 运行 `./mvnw -B test`，Docker job 运行 `./mvnw -B -Pintegration-test verify`、RabbitMQ IT 命令和 Kafka IT 命令。
 - 容器化：`catalog-service/Dockerfile` 和 `order-service/Dockerfile` 使用 JDK 21 JRE Alpine 镜像、非 root 用户和 `JAVA_OPTS`；`deployment/docker-compose.yml` 启动两个业务服务、Prometheus、Grafana、Zipkin。
 - 容器网络：`order-service` 在 Compose 中通过 `DEMO_CLIENTS_CATALOG_BASE_URL=http://catalog-service:8081` 调用 `catalog-service`，Prometheus 通过 `catalog-service:8081` 和 `order-service:8080` 抓取指标。
 - Kubernetes：`deployment/k8s` 提供最小 YAML，包含 `spring3` namespace、业务 ConfigMap、空 Sentry Secret 示例、两个业务 Deployment/Service、Actuator 探针、滚动发布策略、资源配额和 Prometheus 抓取注解。
@@ -76,6 +77,7 @@
 - Nacos 可选专题：通过 `-Pnacos` Maven profile 和 `SPRING_PROFILES_ACTIVE=nacos` 启用服务注册发现、配置中心和 Feign 服务名调用。
 - Sentinel 可选专题：通过 `-Psentinel` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=sentinel` 加载本地 Flow、ParamFlow、Degrade 规则。
 - RabbitMQ 可选专题：通过 `-Prabbitmq` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=rabbitmq` 加载 AMQP 连接、exchange、queue、DLQ 和 listener retry 配置。
+- Kafka 可选专题：通过 `-Pkafka` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=kafka` 加载 Kafka producer/consumer、topic、manual ack、重试和 DLT 配置。
 - Native Image / AOT：使用 Spring Boot parent 内置 `native` profile 做手动学习验证，当前以 `catalog-service` 为最小目标；本机已通过 `spring-boot:process-aot`，`native:compile` 因未安装 GraalVM `native-image` 而停止。
 - JSON 日志专题：`json-logging` profile 开启 `logging.structured.format.console=logstash` 和 `demo.observability.http-logging.enabled=true`。
 - API 治理专题：`common` 维护错误码常量，两个 Servlet 服务的 `ProblemDetail` 统一补充 `errorCode`、`requestId`、`timestamp`，订单服务提供 v1/v2 版本路由和旧路径废弃头。
@@ -268,6 +270,7 @@ Prometheus 当前通过 Service/Pod 注解抓取 `/actuator/prometheus`。如果
 ./mvnw -Pcontract-test -pl catalog-service -am install
 ./mvnw -Pcontract-test -pl order-service -am -Dtest=OrderCatalogContractStubTest -Dsurefire.failIfNoSpecifiedTests=false test
 ./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests
+./mvnw -Pkafka,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderKafkaProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
 kubeconform -strict -summary deployment/k8s/*.yaml
 ./mvnw package -DskipTests
 docker compose -f deployment/docker-compose.yml up -d
@@ -369,6 +372,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `order-service` 增加 `OrderJsonLoggingProfileTest`，覆盖 `json-logging` profile 输出合法 JSON、生成 `X-Request-Id`、请求日志字段和 `Authorization`/password 脱敏。
 - `order-service` 增加 `OrderCatalogContractStubTest`，在 `contract-test` profile 下使用 provider 生成的 stubs 验证正常响应、商品不存在和 catalog 模拟失败 fallback。
 - `order-service` 增加 `OrderRabbitMqProfileIT`，在 `rabbitmq` + `integration-test` profile 下用 Testcontainers 启动 `rabbitmq:3.13-management`，验证订单预览事件生产/消费、重复 eventId 幂等跳过和异常 SKU 重试后进入 DLQ。
+- `order-service` 增加 `OrderKafkaProfileIT`，在 `kafka` + `integration-test` profile 下用 Testcontainers 启动 `confluentinc/cp-kafka:7.6.1`，验证订单预览事件生产/消费、requestId/traceId 事件字段、重复 eventId 幂等跳过、同 key 顺序消费和异常 SKU 重试后进入 DLT。
 - `catalog-service` 增加 Spring Cloud Contract provider 测试，覆盖商品查询成功、`404 ProblemDetail` 和 `500 ProblemDetail` 的响应结构。
 - `catalog-service` 已执行 Spring AOT 处理验证；native binary 编译已记录本机缺少 GraalVM `native-image` 的失败原因和后续处理建议。
 - `deployment/k8s` 已通过 `kubeconform -strict -summary deployment/k8s/*.yaml` 校验，8 个资源全部有效；当前本机无 Kubernetes API server，`kubectl apply --dry-run=client` 会失败在 API discovery。
@@ -384,8 +388,8 @@ docker compose -f platform/nacos/docker-compose.yml config
 
 - 不接入 MySQL、PostgreSQL、JPA、MyBatis、Flyway、Liquibase。
 - 不接入 Redis 或 Spring Session Redis。
-- 不实现 Kafka、RocketMQ 代码。
-- 不把 RabbitMQ 作为默认 profile 或核心业务路径的必需依赖。
+- 不实现 RocketMQ 代码。
+- 不把 RabbitMQ 或 Kafka 作为默认 profile 或核心业务路径的必需依赖。
 - 不实现数据库事务消息、outbox、分布式事务消息。
 - 不把 native binary 构建加入默认 CI 或默认发布路径。
 - 不维护生产级 Kubernetes 集群、Ingress、HPA、ServiceMonitor CRD 或 Helm chart。

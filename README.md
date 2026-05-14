@@ -21,7 +21,7 @@
 - Spring Boot 3.5.14
 - Spring Cloud 2025.0.2
 - Maven 多模块 + Maven Wrapper
-- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI、Spring Cloud Contract、RabbitMQ 可选 profile、Spring AOT / Native Image 专题、自定义 starter / autoconfigure
+- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI、Spring Cloud Contract、RabbitMQ/Kafka 可选 profile、Spring AOT / Native Image 专题、自定义 starter / autoconfigure
 
 ## 快速启动
 
@@ -37,6 +37,7 @@ Docker 可用时，可显式运行 Testcontainers 集成测试：
 ```bash
 ./mvnw -Pintegration-test verify
 ./mvnw -Prabbitmq,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderRabbitMqProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
+./mvnw -Pkafka,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderKafkaProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
 ```
 
 默认账号：
@@ -56,6 +57,7 @@ Docker 可用时，可显式运行 Testcontainers 集成测试：
 - Catalog Prometheus metrics: `http://localhost:8081/actuator/prometheus`
 - Zipkin UI: `http://localhost:9411/zipkin`
 - RabbitMQ Management UI: `http://localhost:15672`（`rabbitmq` profile 可选专题）
+- Kafka UI: `http://localhost:8089`（`kafka` profile 可选专题）
 
 ## 示例调用
 
@@ -151,6 +153,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - API 治理：已补充 ProblemDetail 稳定错误码、requestId、timestamp、订单 v1/v2 示例、旧接口废弃头和 OpenAPI 分组。
 - Spring Cloud Contract：已补充 `catalog-service` provider 契约、生成 stubs jar、`order-service` consumer Stub Runner 测试，覆盖成功、商品不存在和模拟失败三类下游响应。
 - RabbitMQ 消息队列：已新增可选 `rabbitmq` Maven/Spring profile、本地 Compose、订单预览事件发布/消费、eventId 幂等、消费重试和 DLQ，以及 Testcontainers 集成测试；默认运行路径不引入 MQ。
+- Kafka 消息队列：已新增可选 `kafka` Maven/Spring profile、本地 Compose、订单预览事件发布/消费、message key 分区顺序、manual ack、eventId 幂等、消费重试和 DLT，以及 Testcontainers 集成测试；默认运行路径不引入 Kafka。
 - Native Image / AOT：已补充 `catalog-service` 最小 AOT 验证、native binary / buildpacks 构建命令、第三方库兼容注意事项和排障说明；当前本机 native 编译阻塞于未安装 GraalVM `native-image`。
 - Kubernetes：已新增 `deployment/k8s` 最小部署示例，覆盖 Namespace、ConfigMap、Secret 示例、Deployment、Service、Actuator readiness/liveness、资源 requests/limits、滚动发布、优雅停机和 Prometheus 抓取注解。
 
@@ -180,7 +183,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 
 #### P2：路线保留
 
-- Kafka、RabbitMQ、RocketMQ：RabbitMQ 基线已完成；后续继续补 Kafka partition/offset/consumer group、RocketMQ tag/顺序/事务消息，并围绕投递语义、幂等、重试、顺序消息和死信队列做对比。
+- Kafka、RabbitMQ、RocketMQ：RabbitMQ 和 Kafka 基线已完成；后续可继续补 Kafka producer transaction、retry topic、consumer lag 面板、RabbitMQ publisher confirm 深化；RocketMQ 保留 tag/顺序/事务消息路线。
 - Native Image / AOT：已补充专题文档和 `catalog-service` AOT 基线；后续可在安装 GraalVM 后继续验证 native binary，并逐步扩展到 `order-service`。
 - Kubernetes：已补最小 YAML 和使用说明；后续可按真实集群补 Ingress、HPA、ServiceMonitor CRD、镜像 registry 发布和 GitOps 流程。
 
@@ -194,3 +197,5 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - [Spring Boot 3 面试补充路线](docs/interview-roadmap.md)
 - [后续任务计划 Prompt 索引](docs/task-plans/README.md)
 - [消息队列后续计划](docs/messaging-roadmap.md)
+- [Kafka 使用与面试专题](docs/kafka-playbook.md)
+- [Kafka 专题计划](docs/task-plans/18-kafka.md)

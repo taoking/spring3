@@ -22,6 +22,8 @@
 | Zipkin | `localhost:9411` |
 | RabbitMQ AMQP | `localhost:5672` |
 | RabbitMQ Management | `localhost:15672` |
+| Kafka broker | `localhost:9092` |
+| Kafka UI | `localhost:8089` |
 | Nacos 控制台 | `localhost:8847` |
 | Nacos 客户端 API | `localhost:8848` |
 
@@ -44,6 +46,7 @@
 | `catalog-service/src/main/resources/application.yml` | 商品服务端口、商品样例、Actuator、Sentry |
 | `order-service/src/main/resources/application.yml` | 订单服务端口、HTTP client 模式、Feign、RestClient、缓存、Resilience4j、Actuator、Sentry |
 | `order-service/src/main/resources/application-rabbitmq.yml` | RabbitMQ 连接、exchange/queue/DLQ、listener retry |
+| `order-service/src/main/resources/application-kafka.yml` | Kafka producer/consumer、topic/DLT、manual ack、重试和演示参数 |
 | `gateway-service/src/main/resources/application.yml` | 网关端口、静态路由、本地限流、fallback、Actuator |
 | `gateway-service/src/main/resources/application-nacos.yml` | 网关 Nacos 服务发现路由 |
 | `observability/docker-compose.yml` | Prometheus + Grafana + Zipkin |
@@ -54,6 +57,8 @@
 | `docs/kubernetes.md` | Kubernetes 部署、探针、滚动发布和排障说明 |
 | `platform/nacos/docker-compose.yml` | 本地 Nacos 3.0.3 |
 | `platform/rabbitmq/docker-compose.yml` | 本地 RabbitMQ + Management UI |
+| `platform/kafka/docker-compose.yml` | 本地 Kafka + Kafka UI |
+| `docs/kafka-playbook.md` | Kafka 使用、事件设计、测试和面试复盘 |
 | `docs/native-aot.md` | Spring AOT / Native Image 构建、验证和排障说明 |
 
 常用环境变量：
@@ -73,6 +78,11 @@
 | `RABBITMQ_USERNAME` | `rabbitmq` profile 下 RabbitMQ 用户名 | `guest` |
 | `RABBITMQ_PASSWORD` | `rabbitmq` profile 下 RabbitMQ 密码 | `guest` |
 | `ORDER_PREVIEW_POISON_SKU` | RabbitMQ 消费失败演示 SKU | `SKU-RABBITMQ-FAIL` |
+| `KAFKA_BOOTSTRAP_SERVERS` | `kafka` profile 下 Kafka bootstrap servers | `localhost:9092` |
+| `ORDER_KAFKA_TOPIC` | Kafka 主 topic | `spring3.order-preview.events.v1` |
+| `ORDER_KAFKA_DLT_TOPIC` | Kafka 死信 topic | `spring3.order-preview.dlt.v1` |
+| `ORDER_KAFKA_CONSUMER_GROUP` | Kafka 消费组 | `spring3-order-preview` |
+| `ORDER_KAFKA_POISON_SKU` | Kafka 消费失败演示 SKU | `SKU-KAFKA-FAIL` |
 | `JAVA_OPTS` | 容器内 JVM 参数，例如内存比例和 OOM 退出策略 | `-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError` |
 | `SERVER_SHUTDOWN` | Spring Boot 优雅停机开关 | `graceful` |
 | `SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE` | 优雅停机每阶段等待时间 | `20s` |
@@ -103,14 +113,20 @@ Docker Desktop 可用时运行 Testcontainers 集成测试：
 ./mvnw -Prabbitmq,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderRabbitMqProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
 ```
 
-`integration-test` Maven profile 使用 Failsafe 执行 `**/*IT.java`，普通 `./mvnw test` 不会启动容器。当前 `GatewayNginxContainerIT` 使用固定镜像 `nginx:1.27.3-alpine` 模拟真实下游服务，`OrderRabbitMqProfileIT` 使用固定镜像 `rabbitmq:3.13-management` 验证消息生产、消费、幂等和 DLQ。RabbitMQ IT 还需要额外启用 Maven `-Prabbitmq`，所以默认 `./mvnw -Pintegration-test verify` 不会引入 MQ 依赖。Docker 不可用时，Testcontainers 测试会通过 `disabledWithoutDocker` 跳过；本地需要先启动 Docker Desktop。
+只运行 Kafka 容器集成测试：
+
+```bash
+./mvnw -Pkafka,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderKafkaProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
+```
+
+`integration-test` Maven profile 使用 Failsafe 执行 `**/*IT.java`，普通 `./mvnw test` 不会启动容器。当前 `GatewayNginxContainerIT` 使用固定镜像 `nginx:1.27.3-alpine` 模拟真实下游服务，`OrderRabbitMqProfileIT` 使用固定镜像 `rabbitmq:3.13-management` 验证消息生产、消费、幂等和 DLQ，`OrderKafkaProfileIT` 使用固定镜像 `confluentinc/cp-kafka:7.6.1` 验证 Kafka 生产消费、幂等、顺序和 DLT。RabbitMQ/Kafka IT 还需要额外启用对应 Maven profile，所以默认 `./mvnw -Pintegration-test verify` 不会引入 MQ 依赖。Docker 不可用时，Testcontainers 测试会通过 `disabledWithoutDocker` 跳过；本地需要先启动 Docker Desktop。
 
 GitHub Actions：
 
 | Job | 命令 | 说明 |
 | --- | --- | --- |
 | `unit-tests` | `./mvnw -B test` | 默认轻量测试，不依赖 Docker |
-| `integration-tests` | `docker info`、`./mvnw -B -Pintegration-test verify`、RabbitMQ IT 命令 | Docker 可用时运行 Gateway 和 RabbitMQ Testcontainers 集成测试 |
+| `integration-tests` | `docker info`、`./mvnw -B -Pintegration-test verify`、RabbitMQ IT 命令、Kafka IT 命令 | Docker 可用时运行 Gateway、RabbitMQ 和 Kafka Testcontainers 集成测试 |
 
 只测试单个模块：
 
@@ -800,6 +816,89 @@ Sentinel 与 Resilience4j 对比：
 - Sentinel 本地日志目录可通过 `SENTINEL_LOG_DIR` 设置，默认写入 `${user.home}/logs/csp`。
 - 本项目的 Sentinel 规则是本地内存规则，重启后重新加载；生产环境通常接 Dashboard、Nacos 或 Apollo 等数据源。
 - 当前熔断探针用慢调用比例复现；异常比例和异常数规则可用同一资源模型扩展。
+
+## Kafka 消息队列
+
+Kafka 是可选消息队列专题，默认 profile 不引入 Kafka 运行依赖。只有同时使用 Maven `-Pkafka` 和 Spring `SPRING_PROFILES_ACTIVE=kafka` 时，才会编译并启用 `order-service/src/kafka/java` 下的发布者、消费者和 topic 配置。
+
+当前示例围绕 `OrderPreviewCreatedEvent`：
+
+| 能力 | 当前实现 |
+| --- | --- |
+| 生产 | `KafkaOrderPreviewEventPublisher` 监听订单预览事件，通过 `KafkaTemplate` 发布 JSON event |
+| 消费 | `KafkaOrderPreviewConsumer` 使用 `@KafkaListener` 消费订单预览 topic |
+| 分区顺序 | 使用 `orderId` / `partitionKey` 作为 message key，同一 key 进入同一 partition |
+| Offset | 关闭 auto commit，listener 使用 manual ack |
+| 幂等 | 使用 `eventId` 和内存 `ProcessedKafkaEventStore`，重复消息会被跳过并 ack |
+| 重试/DLT | `DefaultErrorHandler` + `DeadLetterPublishingRecoverer`，重试耗尽后进入 DLT |
+| 指标 | `orders.preview.kafka.published.total`、`processed.total`、`duplicates.total`、`failed.total`、`send.failed.total` |
+
+本地 Kafka：
+
+```bash
+docker compose -f platform/kafka/docker-compose.yml config
+docker compose -f platform/kafka/docker-compose.yml up -d
+docker compose -f platform/kafka/docker-compose.yml ps
+```
+
+Kafka UI：
+
+```text
+http://localhost:8089
+```
+
+启动业务服务：
+
+```bash
+./mvnw -pl catalog-service spring-boot:run
+```
+
+```bash
+SPRING_PROFILES_ACTIVE=kafka ./mvnw -Pkafka -pl order-service spring-boot:run
+```
+
+正常生产和消费：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -H 'X-Request-Id: kafka-demo-request' \
+  -H 'traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01' \
+  -d '{"sku":"SKU-KAFKA-OK","quantity":2}' \
+  http://localhost:8080/api/orders/preview
+```
+
+消费失败、重试和死信：
+
+```bash
+curl -u user:user123 \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-KAFKA-FAIL","quantity":2}' \
+  http://localhost:8080/api/orders/preview
+```
+
+查看指标：
+
+```bash
+curl -u user:user123 http://localhost:8080/actuator/metrics/orders.preview.kafka.published.total
+curl -u user:user123 http://localhost:8080/actuator/metrics/orders.preview.kafka.processed.total
+curl -u user:user123 http://localhost:8080/actuator/metrics/orders.preview.kafka.failed.total
+```
+
+自动化验证：
+
+```bash
+./mvnw -Pkafka -pl order-service -am test -DskipTests
+./mvnw -Pkafka,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderKafkaProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
+```
+
+停止 Kafka：
+
+```bash
+docker compose -f platform/kafka/docker-compose.yml down
+```
+
+完整说明见 [Kafka 使用与面试专题](kafka-playbook.md)。
 
 ## RabbitMQ 消息队列
 

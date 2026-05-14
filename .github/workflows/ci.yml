@@ -52,3 +52,12 @@ jobs:
           -Dit.test=OrderRabbitMqProfileIT
           -Dfailsafe.failIfNoSpecifiedTests=false
           verify
+
+      - name: Run Kafka integration tests
+        run: >
+          ./mvnw -B -Pkafka,integration-test -pl order-service -am
+          -Dtest=none
+          -Dsurefire.failIfNoSpecifiedTests=false
+          -Dit.test=OrderKafkaProfileIT
+          -Dfailsafe.failIfNoSpecifiedTests=false
+          verify

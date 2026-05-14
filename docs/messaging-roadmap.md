@@ -1,6 +1,6 @@
 # 消息队列专题路线
 
-当前项目已完成 RabbitMQ 可选基线：默认 profile 不引入消息队列依赖，只有同时使用 Maven `-Prabbitmq` 和 Spring `SPRING_PROFILES_ACTIVE=rabbitmq` 时才启用。
+当前项目已完成 RabbitMQ 和 Kafka 可选基线：默认 profile 不引入消息队列依赖，只有同时使用对应 Maven profile 和 Spring profile 时才启用。
 
 ## 当前 RabbitMQ 示例
 
@@ -42,20 +42,33 @@ SPRING_PROFILES_ACTIVE=rabbitmq ./mvnw -Prabbitmq -pl order-service spring-boot:
 
 适合高吞吐、日志流、事件流、数据管道和需要持久化顺序消费的场景。
 
+详细执行计划、任务 prompt、场景拆分、事件设计、测试验收和面试追问见 [Kafka 专题计划](task-plans/18-kafka.md)，本地运行和面试复盘见 [Kafka 使用与面试专题](kafka-playbook.md)。
+
+当前 Kafka 示例：
+
+| 能力 | 当前实现 |
+| --- | --- |
+| 生产 | `KafkaOrderPreviewEventPublisher` 监听 `OrderPreviewCreatedEvent`，通过 `KafkaTemplate` 发布 `OrderPreviewKafkaEvent` |
+| 消费 | `KafkaOrderPreviewConsumer` 使用 `@KafkaListener` 消费订单预览 topic |
+| 分区顺序 | 使用 `orderId` / `partitionKey` 作为 message key，同一 key 落到同一 partition |
+| Offset | 关闭 auto commit，listener 使用 manual ack，业务处理成功后提交 |
+| 幂等 | `ProcessedKafkaEventStore` 基于 eventId 做内存去重，重复消息跳过并 ack |
+| 重试/DLT | `DefaultErrorHandler` + `DeadLetterPublishingRecoverer`，消费失败重试后进入 DLT |
+| 指标 | 发布、发送失败、消费成功、重复、失败分别有 Micrometer Counter |
+| 测试 | `OrderKafkaProfileIT` 使用 Testcontainers Kafka 覆盖生产消费、幂等、同 key 顺序和 DLT |
+
 后续建议学习：
 
-- topic、partition、offset、consumer group。
-- `spring-kafka` 的 producer、consumer、listener container。
-- 手动提交 offset、重试 topic、dead letter topic。
-- partition 内顺序、消息 key、幂等 producer、事务 producer。
-- consumer lag、rebalance、重复消费和 offset 提交时机。
-- Micrometer 指标和 consumer lag 监控。
+- producer transaction、read-process-write exactly-once 边界。
+- retry topic 和 blocking retry 的取舍。
+- consumer lag 面板、rebalance 排查和 partition skew 诊断。
+- Schema Registry、Avro/Protobuf/JSON Schema 的长期兼容治理。
 
 建议后续示例：
 
-- `order-service` 发布 `OrderPreviewCreated` 到 Kafka topic。
-- 使用 message key 让同一个 sku 或 orderId 落到同一 partition。
-- 增加 consumer group、手动 ack、retry topic / DLT 测试。
+- 增加 Kafka producer transaction 的最小 read-process-write 示例。
+- 使用 retry topic 替换当前 blocking retry，比较两种方案对 partition 后续消息的影响。
+- 增加 consumer lag 查询命令和 Grafana 面板。
 
 ## RabbitMQ
 
