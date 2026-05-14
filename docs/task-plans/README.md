@@ -31,6 +31,7 @@
 | 16 | Native Image / AOT（文档和 catalog AOT 基线已完成） | [16-native-aot.md](16-native-aot.md) | P2 |
 | 17 | Kubernetes（最小 YAML 基线已完成） | [17-kubernetes.md](17-kubernetes.md) | P2 |
 | 18 | Kafka 专题（基线已完成） | [18-kafka.md](18-kafka.md) | P2 |
+| 19 | 资深面试覆盖补齐总计划 | [19-interview-expansion.md](19-interview-expansion.md) | P0 |
 
 ## 通用执行约束
 

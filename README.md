@@ -163,6 +163,9 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 
 #### P0：优先补充
 
+- 资深面试覆盖补齐总计划：已按架构师/面试官视角补充覆盖评估、缺口、追问和执行 prompt，见 [资深面试覆盖补齐计划](docs/task-plans/19-interview-expansion.md)。
+- 数据一致性与事务边界：当前项目不接数据库，后续先补事务传播、隔离级别、幂等、outbox/inbox、补偿和对账的设计型专题。
+- Redis 与缓存治理：当前仅有 Caffeine，后续先补 Redis 缓存一致性、穿透/击穿/雪崩、分布式锁、热点 key 和限流计数设计专题。
 - Nacos 深化：已完成 `nacos` profile、服务注册发现、启动期配置中心读取；后续补动态刷新、namespace/group 多环境隔离和 Testcontainers 集成测试。
 - Spring Cloud Gateway 深化：已完成 `gateway-service`、静态/Nacos 路由、过滤器、鉴权透传、限流和 fallback；后续可补灰度路由、跨域和更贴近生产的分布式限流。
 - 链路追踪深化：已完成 Micrometer Tracing + Zipkin 基线；后续可补 Tempo / OpenTelemetry Collector、采样策略、trace 与日志平台联查。
@@ -196,6 +199,7 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - [Kubernetes 部署示例](docs/kubernetes.md)
 - [Spring Boot 3 面试补充路线](docs/interview-roadmap.md)
 - [后续任务计划 Prompt 索引](docs/task-plans/README.md)
+- [资深面试覆盖补齐计划](docs/task-plans/19-interview-expansion.md)
 - [消息队列后续计划](docs/messaging-roadmap.md)
 - [Kafka 使用与面试专题](docs/kafka-playbook.md)
 - [Kafka 专题计划](docs/task-plans/18-kafka.md)

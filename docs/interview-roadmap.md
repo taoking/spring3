@@ -8,8 +8,12 @@
 
 每个专题的可执行计划和后续任务 prompt 见：[后续任务计划 Prompt 索引](task-plans/README.md)。
 
+2026-05-15 已按资深架构师 / 面试官视角补充整体评估和执行计划，见：[资深面试覆盖补齐计划](task-plans/19-interview-expansion.md)。该计划把当前项目从“组件覆盖”进一步拆到生产边界、故障推演、设计取舍、底层机制和工程门禁。
+
 | 优先级 | 专题 | 原因 | 当前处理 |
 | --- | --- | --- | --- |
+| P0 | 数据一致性与事务边界 | 资深 Java 面试硬缺口，常从 MQ 幂等、outbox/inbox、事务传播和隔离级别追问 | 当前项目不接数据库，先补设计型 playbook、故障矩阵和面试追问 |
+| P0 | Redis 与缓存治理 | Redis 高频追问覆盖缓存一致性、分布式锁、热点 key 和限流计数 | 当前仅有 Caffeine，本阶段先补 Redis 设计专题，不污染默认运行路径 |
 | P0 | Nacos 注册中心/配置中心 | 微服务面试高频，常和 Spring Cloud Alibaba、OpenFeign、配置刷新一起问 | 已完成可选 `nacos` profile、服务注册发现、启动期配置中心读取；后续深化动态刷新和环境隔离 |
 | P0 | Spring Cloud Gateway | 网关路由、过滤器、鉴权透传、限流、fallback 常在微服务架构题出现 | 已完成独立 `gateway-service`，覆盖静态/Nacos 路由、请求审计、认证透传、本地限流和 fallback |
 | P0 | 链路追踪 | 资深面试会问 metrics/logs/traces 三件套，不只问 Prometheus | 已完成 Micrometer Tracing + Zipkin 基线、日志 traceId/spanId、Feign W3C trace context 传播；后续可补 Tempo / OpenTelemetry Collector 和采样策略 |
