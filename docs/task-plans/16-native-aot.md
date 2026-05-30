@@ -30,7 +30,9 @@
 - 已选择 `catalog-service` 作为最小验证目标。
 - 已确认 `catalog-service` 普通 jar 构建不受影响。
 - 已完成 `catalog-service` Spring AOT 处理验证。
-- 已尝试 `catalog-service` native binary 编译，当前本机失败原因是未安装 GraalVM `native-image`。
+- 已尝试 `catalog-service` 本机 native binary 编译，当前本机失败原因是未安装 GraalVM `native-image`。
+- 已通过 Docker buildpacks 完成 `catalog-service` native 镜像构建、容器启动和 `/actuator/health` 验证。
+- 已补充 `CatalogNativeRuntimeHints`，覆盖 Hibernate Validator / JBoss Logging 在 native 运行期动态查找的 `Log_$logger` 和 `Messages_$bundle`。
 - 未把 native 构建加入默认 CI。
 
 ## 已执行验证
@@ -41,6 +43,21 @@
 ./mvnw help:active-profiles -Pnative -pl catalog-service -am
 ./mvnw -pl catalog-service -am package -DskipTests
 ./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests
+./mvnw -Pnative -pl catalog-service spring-boot:build-image \
+  -DskipTests \
+  -Dspring-boot.build-image.imageName=spring3/catalog-service-native:local
+```
+
+buildpacks native 镜像启动验证：
+
+```bash
+docker run -d -p 18081:8081 \
+  -e TRACING_SAMPLING_PROBABILITY=0.0 \
+  --name spring3-catalog-native-test \
+  spring3/catalog-service-native:local
+
+curl -i http://localhost:18081/actuator/health
+docker rm -f spring3-catalog-native-test
 ```
 
 已尝试但本机失败：
@@ -55,19 +72,19 @@
 The 'native-image' tool was not found on your system.
 ```
 
-后续如果要继续验证 native binary，需要先安装 GraalVM JDK 21 并确保 `native-image` 在 `PATH` 中，或使用 Docker buildpacks native 构建。
+后续如果要继续验证本机 native binary，需要先安装 GraalVM JDK 21 并确保 `native-image` 在 `PATH` 中。
 
 ## 实施要点
 
 - Native 构建耗时长，对本地环境要求高。
 - 先验证简单 provider，再考虑 order-service。
-- 对反射和动态代理问题要记录而不是硬绕。
+- 对反射和动态代理问题要记录原因，优先用 Spring RuntimeHints 显式表达。
 
 ## 验收标准
 
 - 默认 `./mvnw test` 通过。
 - native profile 不影响普通 jar 构建。
-- 至少 catalog-service 有明确 native 构建尝试结果。
+- 至少 catalog-service 有明确 native 构建尝试结果和 buildpacks 可运行结果。
 - 文档记录成功命令或失败原因和后续处理建议。
 - README、使用说明、实施文档和面试路线包含专题入口。
 

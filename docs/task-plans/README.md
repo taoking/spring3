@@ -9,6 +9,8 @@
 3. 执行前先阅读该专题的“实施要点”“验收标准”和“不做”。
 4. 执行后把验证命令、结果和未完成项写回对应文档或 README。
 
+整体覆盖度评分、追问压力测试和补齐优先级见：[资深面试覆盖度检查报告](../interview-coverage-assessment.md)。
+
 ## 执行顺序建议
 
 | 顺序 | 专题 | 文档 | 优先级 |
@@ -28,10 +30,19 @@
 | 13 | API 治理（基线已完成） | [13-api-governance.md](13-api-governance.md) | P1 |
 | 14 | Spring Cloud Contract（基线已完成） | [14-contract-testing.md](14-contract-testing.md) | P1 |
 | 15 | 消息队列（RabbitMQ 基线已完成） | [15-messaging.md](15-messaging.md) | P2 |
-| 16 | Native Image / AOT（文档和 catalog AOT 基线已完成） | [16-native-aot.md](16-native-aot.md) | P2 |
+| 16 | Native Image / AOT（catalog buildpacks native 验证已完成） | [16-native-aot.md](16-native-aot.md) | P2 |
 | 17 | Kubernetes（最小 YAML 基线已完成） | [17-kubernetes.md](17-kubernetes.md) | P2 |
 | 18 | Kafka 专题（基线已完成） | [18-kafka.md](18-kafka.md) | P2 |
 | 19 | 资深面试覆盖补齐总计划 | [19-interview-expansion.md](19-interview-expansion.md) | P0 |
+| 20 | 数据一致性与事务边界（设计专题已完成） | [20-data-consistency.md](20-data-consistency.md) | P0 |
+| 21 | Redis 与缓存治理（设计专题已完成） | [21-redis-cache.md](21-redis-cache.md) | P0 |
+| 22 | 可观测性生产化（告警与 runbook 已完成） | [22-observability-production.md](22-observability-production.md) | P0 |
+| 23 | Gateway 生产能力（CORS/灰度路由已完成） | [23-gateway-production.md](23-gateway-production.md) | P0 |
+| 24 | 消息队列生产语义（设计专题已完成） | [24-messaging-production.md](24-messaging-production.md) | P1 |
+| 25 | JVM、并发和 Java 21 诊断（设计专题已完成） | [25-jvm-concurrency.md](25-jvm-concurrency.md) | P1 |
+| 26 | 工程质量与 CI 门禁（设计专题已完成） | [26-engineering-quality.md](26-engineering-quality.md) | P1 |
+| 27 | Kubernetes 生产化（设计专题已完成） | [27-kubernetes-production.md](27-kubernetes-production.md) | P2 |
+| 28 | Native Image 完整验证（catalog buildpacks 闭环已完成） | [28-native-image-verification.md](28-native-image-verification.md) | P2 |
 
 ## 通用执行约束
 

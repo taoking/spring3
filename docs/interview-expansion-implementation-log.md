@@ -1,0 +1,51 @@
+# 资深面试补齐实施日志
+
+## 2026-05-15
+
+- 开始执行“按照计划完成所有的开发内容，按优先级顺序”。
+- 读取 `docs/task-plans/19-interview-expansion.md`，确认执行顺序为：数据一致性、Redis 缓存、OAuth2 生产化、可观测性生产化、Gateway 生产能力、消息队列深化、JVM 并发诊断、工程质量门禁、Kubernetes 生产化、Native Image 完整验证。
+- 检查当前工作树：`main...origin/main [ahead 2]`，无未提交改动。
+- P0-1 数据一致性与事务边界：新增 `docs/data-consistency-playbook.md`，覆盖当前项目结合点、事务失效、传播行为、隔离级别、幂等、outbox/inbox、故障矩阵、DLQ/DLT 重放、对账补偿和面试追问。
+- P0-1 数据一致性与事务边界：新增 `docs/task-plans/20-data-consistency.md`，记录任务 prompt、场景清单、验收标准、验收命令和不做范围。
+- 更新 `README.md`、`docs/interview-roadmap.md`、`docs/task-plans/README.md` 和 `docs/task-plans/19-interview-expansion.md`，把数据一致性专题标记为已补设计型内容。
+- P0-2 Redis 与缓存治理：新增 `docs/redis-cache-playbook.md`，覆盖当前 Caffeine 示例边界、Caffeine/Redis 对比、缓存模式、穿透/击穿/雪崩、缓存一致性、多级缓存、分布式锁、Redis 限流、短期幂等和运维排障。
+- P0-2 Redis 与缓存治理：新增 `docs/task-plans/21-redis-cache.md`，记录任务 prompt、场景清单、验收标准、验收命令和不做范围。
+- 更新 `README.md`、`docs/interview-roadmap.md`、`docs/task-plans/README.md` 和 `docs/task-plans/19-interview-expansion.md`，把 Redis 与缓存治理专题标记为已补设计型内容。
+- P0-3 OAuth2/JWT 生产化：检查 `catalog-service` 和 `order-service` 的 `SecurityConfig`，确认当前 JWT profile 使用 HS256 本地 secret、roles/scope 映射，并保留 Basic 内部调用。
+- P0-3 OAuth2/JWT 生产化：增强两个服务的 `SecurityConfig`，支持 `demo.security.jwt.jwk-set-uri` 和 `demo.security.jwt.issuer-uri`，配置优先级高于本地 HS256 secret。
+- P0-3 OAuth2/JWT 生产化：更新两个服务的 `application-jwt.yml`，增加 `DEMO_SECURITY_JWT_ISSUER_URI` 和 `DEMO_SECURITY_JWT_JWK_SET_URI` 配置入口。
+- P0-3 OAuth2/JWT 生产化：新增 `docs/security-oauth2-playbook.md`，覆盖 issuer-uri、jwk-set-uri、JWK rotation、role/scope、client_credentials、网关和服务侧职责、token 吊销和面试追问。
+- P0-3 OAuth2/JWT 生产化：更新 `docs/task-plans/05-oauth2-jwt.md`、`docs/USAGE.md`、`docs/interview-roadmap.md`、`README.md` 和 `docs/task-plans/19-interview-expansion.md`。
+- 执行 `./mvnw -pl catalog-service,order-service -am test`，通过，确认 JWT profile 的本地 HS256 行为和默认测试未被破坏。
+- P0-4 可观测性生产化：新增 `docs/observability-production-playbook.md`，覆盖 PromQL、告警、SLO、label 基数、trace 采样、日志字段规范和订单慢查询/catalog 失败/Kafka lag/Gateway 429 runbook。
+- P0-4 可观测性生产化：新增 `observability/prometheus/alert-rules.yml`，包含服务存活、HTTP 5xx、HTTP p95、订单 fallback、熔断器打开和 JVM heap 压力告警规则草案。
+- P0-4 可观测性生产化：更新 `observability/prometheus/prometheus.yml` 和 `observability/docker-compose.yml`，挂载并加载告警规则文件。
+- P0-4 可观测性生产化：新增 `docs/task-plans/22-observability-production.md`，并更新 README、USAGE、interview roadmap、task plans 索引和第 19 号总计划。
+- 执行 `docker compose -f observability/docker-compose.yml config`，配置解析通过。
+- P0-5 Gateway 生产能力：新增 `orders-canary-route`，请求携带 `X-Canary: true` 时路由到 `demo.gateway.routes.order-canary-uri`。
+- P0-5 Gateway 生产能力：使用 Spring Cloud Gateway 内置 `spring.cloud.gateway.server.webflux.globalcors.*` 配置 CORS 预检，并在 `GatewayRouteTest` 使用随机端口绝对 URL 验证真实浏览器预检路径。
+- P0-5 Gateway 生产能力：更新 `docs/gateway-production-playbook.md`、`docs/task-plans/23-gateway-production.md`、`docs/USAGE.md`、README、interview roadmap 和任务索引。
+- 执行 `./mvnw -pl gateway-service test`，通过，`Tests run: 8, Failures: 0, Errors: 0, Skipped: 0`。
+- P1-6 消息队列深化：新增 `docs/messaging-production-playbook.md`，覆盖 Kafka 可靠生产、顺序、manual ack、幂等、retry topic、DLT、consumer lag、producer transaction 边界，RabbitMQ publisher confirm、return callback、manual ack/nack、prefetch 和队列堆积排查，以及 RocketMQ tag、顺序、延迟和事务半消息设计。
+- P1-6 消息队列深化：新增 `docs/task-plans/24-messaging-production.md`，记录任务 prompt、场景矩阵、验收命令和不做范围。
+- 更新 README、`docs/USAGE.md`、`docs/interview-roadmap.md`、`docs/messaging-roadmap.md`、`docs/task-plans/README.md` 和 `docs/task-plans/19-interview-expansion.md`，把消息队列生产语义专题标记为已补设计型内容。
+- 执行 `docker compose -f platform/kafka/docker-compose.yml config` 和 `docker compose -f platform/rabbitmq/docker-compose.yml config`，配置解析通过。
+- P1-7 JVM、并发和 Java 21 诊断：新增 `docs/jvm-concurrency-playbook.md`，覆盖当前 virtual-thread profile 结合点、线程池参数、`CompletableFuture`、MDC/trace context、pinned thread、JFR、jcmd、jstack、jmap、GC log 和 CPU 高/线程阻塞/内存上涨/接口超时排查路径。
+- P1-7 JVM、并发和 Java 21 诊断：新增 `docs/task-plans/25-jvm-concurrency.md`，记录任务 prompt、验收命令和不做范围。
+- 更新 README、`docs/USAGE.md`、`docs/interview-roadmap.md`、`docs/task-plans/README.md` 和 `docs/task-plans/19-interview-expansion.md`，把 JVM 并发诊断专题标记为已补设计型内容。
+- 执行 `./mvnw -pl order-service -am -Dtest=OrderVirtualThreadProfileTest -Dsurefire.failIfNoSpecifiedTests=false test`，通过，`Tests run: 3, Failures: 0, Errors: 0, Skipped: 0`。
+- P1-8 工程质量与 CI 门禁：新增 `docs/engineering-quality-playbook.md`，覆盖当前 CI 基线、L0-L4 门禁分层、JaCoCo、静态扫描、依赖安全、SBOM、镜像扫描、ArchUnit 规则候选、测试分层和面试追问。
+- P1-8 工程质量与 CI 门禁：新增 `docs/task-plans/26-engineering-quality.md`，记录任务 prompt、验收命令、可选深度命令和不做范围。
+- 更新 README、`docs/USAGE.md`、`docs/interview-roadmap.md`、`docs/task-plans/README.md` 和 `docs/task-plans/19-interview-expansion.md`，把工程质量门禁专题标记为已补设计型内容。
+- P2-9 Kubernetes 生产化：新增 `docs/kubernetes-production-playbook.md`，覆盖当前 `deployment/k8s` 资产、Ingress、HPA、PDB、ServiceMonitor、ConfigMap/Secret、镜像 tag/digest、GitOps、发布回滚和故障排查。
+- P2-9 Kubernetes 生产化：新增 `docs/task-plans/27-kubernetes-production.md`，记录任务 prompt、验收命令和不做范围。
+- 更新 README、`docs/USAGE.md`、`docs/interview-roadmap.md`、`docs/task-plans/README.md` 和 `docs/task-plans/19-interview-expansion.md`，把 Kubernetes 生产化专题标记为已补设计型内容。
+- 执行 `kubectl apply --dry-run=client -f deployment/k8s`，本机 kubeconfig 指向的 API server `localhost:8080` 不可用，无法下载 OpenAPI；改用 `kubeconform -strict -summary deployment/k8s` 离线校验，通过，`Valid: 8, Invalid: 0, Errors: 0`。
+- P2-10 Native Image 完整验证：确认本机 `command -v native-image` 无输出，`./mvnw -Pnative -pl catalog-service native:compile -DskipTests` 失败原因是缺少 GraalVM `native-image`。
+- P2-10 Native Image 完整验证：执行 `./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests` 通过。
+- P2-10 Native Image 完整验证：首次 buildpacks native 镜像构建成功，但容器启动失败在 Hibernate Validator / JBoss Logging 的 `Log_$logger` 动态类查找。
+- P2-10 Native Image 完整验证：为 `catalog-service` 新增 `CatalogNativeRuntimeHints`，先补 `Log_$logger`，再根据第二次失败补 `Messages_$bundle`。
+- P2-10 Native Image 完整验证：执行 `./mvnw -Pnative -pl catalog-service spring-boot:build-image -DskipTests -Dspring-boot.build-image.imageName=spring3/catalog-service-native:local`，通过，镜像 `spring3/catalog-service-native:local`，最新镜像 ID `ea8db41256a2`。
+- P2-10 Native Image 完整验证：执行 `docker run -d -p 18081:8081 -e TRACING_SAMPLING_PROBABILITY=0.0 --name spring3-catalog-native-test spring3/catalog-service-native:local` 后，`curl -i http://localhost:18081/actuator/health` 返回 `HTTP 200` 和 `{"status":"UP","groups":["liveness","readiness"]}`。
+- P2-10 Native Image 完整验证：容器日志显示 native 启动耗时约 `0.322s`，native-image 阶段产物规模约 `129.89MB`，peak RSS 约 `5.19GB`。
+- P2-10 Native Image 完整验证：新增 `docs/native-image-verification-playbook.md` 和 `docs/task-plans/28-native-image-verification.md`，并更新 README、USAGE、IMPLEMENTATION、native-aot、interview roadmap、coverage assessment、task-plans 索引和第 19 号总计划。

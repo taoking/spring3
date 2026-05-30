@@ -4,6 +4,8 @@
 
 在当前 Basic Auth 基础上补充 JWT 资源服务器示例，覆盖认证、授权、scope/role 映射和测试。
 
+2026-05-15 已补充生产化专题，见 [OAuth2 / JWT 生产化专题](../security-oauth2-playbook.md)。当前 `jwt` profile 继续保留本地 HS256 学习模式，同时预留 `issuer-uri` 和 `jwk-set-uri` 配置入口，用于接入真实授权服务器。
+
 ## 任务 Prompt
 
 ```text
@@ -48,6 +50,7 @@
 - 已提供本地 HS256 开发密钥：`DEMO_SECURITY_JWT_SECRET`，默认值仅用于学习演示，不是生产密钥。
 - 已将 JWT `roles` claim 映射为 `ROLE_USER` / `ROLE_ADMIN`，并保留默认 `scope` 到 `SCOPE_*` 的映射。
 - 已明确服务间认证取舍：JWT profile 下仍保留 Basic 作为内部服务调用凭证；生产可替换为 `client_credentials` service token。
+- 已预留生产化 Resource Server 配置：`demo.security.jwt.issuer-uri` 和 `demo.security.jwt.jwk-set-uri`，优先级高于本地 HS256 secret。
 - 已新增 `CatalogJwtSecurityTest`，覆盖 public endpoint、无 token、错误 token、普通用户 token、管理员 token、JWT 模式下 Basic 内部凭证。
 - 已新增 `OrderJwtSecurityTest`，覆盖无 token、错误 token、普通用户 token、管理员 token，并验证 order 调 catalog 仍使用 Basic。
 - 已在 `docs/USAGE.md` 写入 token 生成脚本和 curl 验证命令。
@@ -60,6 +63,24 @@
 ./mvnw -Pnacos test
 ./mvnw package -DskipTests
 ```
+
+## 生产化补充
+
+配置优先级：
+
+1. `demo.security.jwt.jwk-set-uri`
+2. `demo.security.jwt.issuer-uri`
+3. `demo.security.jwt.secret`
+
+生产环境建议使用授权服务器的 `issuer-uri` 或 `jwk-set-uri`，并结合：
+
+- JWK rotation。
+- audience 校验。
+- `client_credentials` 服务间 token。
+- 网关鉴权与服务侧最小授权。
+- 短 access token + refresh token 或 opaque token 吊销策略。
+
+本项目仍保留 Basic 内部调用，是为了不破坏已有 Feign/RestClient 学习链路。生产系统应改成 service token、mTLS 或服务网格身份。
 
 ## 不做
 

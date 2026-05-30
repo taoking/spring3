@@ -1,0 +1,72 @@
+groups:
+  - name: spring3-service-alerts
+    rules:
+      - alert: Spring3ServiceDown
+        expr: up{job=~"order-service|catalog-service|gateway-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spring3 service is down"
+          description: "{{ $labels.job }} at {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: Spring3HighHttpServerErrorRate
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+          /
+          clamp_min(sum by (job) (rate(http_server_requests_seconds_count[5m])), 0.001)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx rate"
+          description: "{{ $labels.job }} has more than 5% 5xx responses over 5 minutes."
+
+      - alert: Spring3HighHttpP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (job, le) (rate(http_server_requests_seconds_bucket[5m]))
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP p95 latency"
+          description: "{{ $labels.job }} p95 latency is above 1 second for 5 minutes."
+
+      - alert: Spring3OrderFallbackRatioHigh
+        expr: |
+          sum(rate(orders_preview_fallback_total[5m]))
+          /
+          clamp_min(sum(rate(orders_preview_total[5m])), 0.001)
+          > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Order fallback ratio is high"
+          description: "More than 20% of order preview requests are using fallback."
+
+      - alert: Spring3Resilience4jCircuitBreakerOpen
+        expr: resilience4j_circuitbreaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker is open"
+          description: "Circuit breaker {{ $labels.name }} is open."
+
+      - alert: Spring3JvmMemoryPressureHigh
+        expr: |
+          sum by (job) (jvm_memory_used_bytes{area="heap"})
+          /
+          sum by (job) (jvm_memory_max_bytes{area="heap"})
+          > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM heap usage is high"
+          description: "{{ $labels.job }} heap usage is above 85% for 10 minutes."

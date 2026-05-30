@@ -19,6 +19,16 @@ class GatewayRouteConfig {
                                         .setName("catalog-route")
                                         .setFallbackUri("forward:/fallback/catalog")))
                         .uri(properties.catalogUri()))
+                .route("orders-canary-route", route -> route
+                        .path("/orders/**")
+                        .and()
+                        .header("X-Canary", "true")
+                        .filters(filters -> filters
+                                .stripPrefix(1)
+                                .circuitBreaker(config -> config
+                                        .setName("orders-route")
+                                        .setFallbackUri("forward:/fallback/orders")))
+                        .uri(properties.orderCanaryUri()))
                 .route("orders-route", route -> route
                         .path("/orders/**")
                         .filters(filters -> filters

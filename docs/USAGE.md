@@ -59,7 +59,12 @@
 | `platform/rabbitmq/docker-compose.yml` | 本地 RabbitMQ + Management UI |
 | `platform/kafka/docker-compose.yml` | 本地 Kafka + Kafka UI |
 | `docs/kafka-playbook.md` | Kafka 使用、事件设计、测试和面试复盘 |
+| `docs/messaging-production-playbook.md` | Kafka/RabbitMQ/RocketMQ 生产语义、故障处理和面试追问 |
+| `docs/jvm-concurrency-playbook.md` | JVM、线程池、虚拟线程、JFR/jcmd/jstack/jmap 和故障排查 |
+| `docs/engineering-quality-playbook.md` | CI 分层、覆盖率、静态扫描、依赖安全、SBOM、镜像扫描和 ArchUnit |
+| `docs/kubernetes-production-playbook.md` | Ingress、HPA、PDB、ServiceMonitor、Secret、镜像发布和回滚 |
 | `docs/native-aot.md` | Spring AOT / Native Image 构建、验证和排障说明 |
+| `docs/native-image-verification-playbook.md` | Native Image buildpacks 验证、RuntimeHints、启动和面试追问 |
 
 常用环境变量：
 
@@ -121,6 +126,8 @@ Docker Desktop 可用时运行 Testcontainers 集成测试：
 
 `integration-test` Maven profile 使用 Failsafe 执行 `**/*IT.java`，普通 `./mvnw test` 不会启动容器。当前 `GatewayNginxContainerIT` 使用固定镜像 `nginx:1.27.3-alpine` 模拟真实下游服务，`OrderRabbitMqProfileIT` 使用固定镜像 `rabbitmq:3.13-management` 验证消息生产、消费、幂等和 DLQ，`OrderKafkaProfileIT` 使用固定镜像 `confluentinc/cp-kafka:7.6.1` 验证 Kafka 生产消费、幂等、顺序和 DLT。RabbitMQ/Kafka IT 还需要额外启用对应 Maven profile，所以默认 `./mvnw -Pintegration-test verify` 不会引入 MQ 依赖。Docker 不可用时，Testcontainers 测试会通过 `disabledWithoutDocker` 跳过；本地需要先启动 Docker Desktop。
 
+工程质量门禁、覆盖率、静态扫描、依赖安全、SBOM、镜像扫描和 ArchUnit 规则候选见 [工程质量与 CI 门禁专题](engineering-quality-playbook.md)。
+
 GitHub Actions：
 
 | Job | 命令 | 说明 |
@@ -142,9 +149,12 @@ Native / AOT 手动验证命令：
 ./mvnw -pl catalog-service -am package -DskipTests
 ./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests
 ./mvnw -Pnative -pl catalog-service native:compile -DskipTests
+./mvnw -Pnative -pl catalog-service spring-boot:build-image \
+  -DskipTests \
+  -Dspring-boot.build-image.imageName=spring3/catalog-service-native:local
 ```
 
-`native:compile` 需要本机安装 GraalVM `native-image`。当前仓库不把 native 构建加入默认 CI。
+`native:compile` 需要本机安装 GraalVM `native-image`。当前本机没有 `native-image`，但 Docker buildpacks native 镜像已验证通过。当前仓库不把 native 构建加入默认 CI。
 
 清理构建产物：
 
@@ -410,6 +420,8 @@ tail -f order-service/target/run.log | grep -E 'Thread probe|Async notification|
 ```bash
 ./mvnw -pl order-service -am -Dtest=OrderVirtualThreadProfileTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
+
+JVM、线程池、`CompletableFuture`、pinned thread、JFR、jcmd、jstack、jmap、GC log 和线上排查路径见 [JVM、并发和 Java 21 诊断专题](jvm-concurrency-playbook.md)。
 
 ## 前台启动服务
 
@@ -898,7 +910,7 @@ curl -u user:user123 http://localhost:8080/actuator/metrics/orders.preview.kafka
 docker compose -f platform/kafka/docker-compose.yml down
 ```
 
-完整说明见 [Kafka 使用与面试专题](kafka-playbook.md)。
+完整说明见 [Kafka 使用与面试专题](kafka-playbook.md)。Kafka/RabbitMQ/RocketMQ 的生产语义、lag/堆积排查、confirm/ack、retry topic、DLT/DLQ 和事务边界见 [消息队列生产语义专题](messaging-production-playbook.md)。
 
 ## RabbitMQ 消息队列
 
@@ -1000,6 +1012,8 @@ Native Image / AOT 是 Spring Boot 3 专题内容，当前只做手动学习和�
 | `catalog-service` 普通 jar 构建 | 通过 |
 | `catalog-service` `spring-boot:process-aot` | 通过 |
 | `catalog-service` `native:compile` | 已尝试，本机缺少 GraalVM `native-image`，未生成 binary |
+| `catalog-service` buildpacks native 镜像 | 通过，镜像 `spring3/catalog-service-native:local` |
+| native 容器 health check | 通过，`/actuator/health` 返回 `UP` |
 
 检查环境：
 
@@ -1028,7 +1042,7 @@ native-image --version
 
 ```bash
 ./mvnw -Pnative -pl catalog-service native:compile -DskipTests
-ZIPKIN_TRACING_ENABLED=false catalog-service/target/catalog-service --server.port=8081
+TRACING_SAMPLING_PROBABILITY=0.0 catalog-service/target/catalog-service --server.port=8081
 curl -fsS http://localhost:8081/actuator/health
 ```
 
@@ -1039,16 +1053,24 @@ Docker buildpacks native 镜像构建：
   -DskipTests \
   -Dspring-boot.build-image.imageName=spring3/catalog-service-native:local
 
-docker run --rm -p 8081:8081 \
-  -e ZIPKIN_TRACING_ENABLED=false \
+docker run -d -p 18081:8081 \
+  -e TRACING_SAMPLING_PROBABILITY=0.0 \
+  --name spring3-catalog-native-test \
   spring3/catalog-service-native:local
+
+curl -fsS http://localhost:18081/actuator/health
+docker rm -f spring3-catalog-native-test
 ```
 
 排查重点：
 
 - `native-image` 不存在时，先安装 GraalVM JDK 21 并设置 `JAVA_HOME` 或 `GRAALVM_HOME`。
+- Hibernate Validator / JBoss Logging 在 native 运行期需要 `CatalogNativeRuntimeHints` 保留 `Log_$logger` 和 `Messages_$bundle`。
+- 本地只验证 native 启动和 health check 时，可设置 `TRACING_SAMPLING_PROBABILITY=0.0` 避免 Zipkin 未启动产生 exporter 连接日志。
 - SpringDoc、Sentry、Feign、Gateway、AOP、Jackson 和动态代理都需要 native 后分别验证，不要默认认为 JVM 运行成功就等于 native 可用。
 - 第一次 native 构建耗时明显长于普通 jar 构建，学习项目先从 `catalog-service` 做最小闭环。
+
+完整复盘见 [Native Image 完整验证专题](native-image-verification-playbook.md)。
 
 ## OAuth2 Resource Server / JWT
 
@@ -1153,6 +1175,22 @@ curl -i -H 'Authorization: Bearer invalid.token.value' \
 
 以上本地 HS256 密钥只用于学习演示。真实环境应使用授权服务器的 `issuer-uri` 或 `jwk-set-uri`，不要把生产私钥、长期有效 token 或真实密钥提交到仓库。
 
+生产化 Resource Server 配置入口：
+
+```bash
+SPRING_PROFILES_ACTIVE=jwt \
+DEMO_SECURITY_JWT_ISSUER_URI=https://idp.example.com/realms/spring3 \
+./mvnw -pl order-service spring-boot:run
+```
+
+```bash
+SPRING_PROFILES_ACTIVE=jwt \
+DEMO_SECURITY_JWT_JWK_SET_URI=https://idp.example.com/realms/spring3/protocol/openid-connect/certs \
+./mvnw -pl order-service spring-boot:run
+```
+
+配置优先级为 `jwk-set-uri`、`issuer-uri`、本地 HS256 `secret`。生产环境还要补 audience 校验、JWK rotation 监控和服务间 `client_credentials` token 设计。详见 [OAuth2 / JWT 生产化专题](security-oauth2-playbook.md)。
+
 ## Spring Cloud Gateway
 
 `gateway-service` 是统一入口，默认端口 `8088`。默认 profile 使用静态路由：
@@ -1219,6 +1257,31 @@ curl -i -u user:user123 \
 curl -fsS http://localhost:8088/actuator/health
 curl -fsS http://localhost:8088/actuator/prometheus | grep jvm
 ```
+
+验证 CORS 预检：
+
+```bash
+curl -i -X OPTIONS \
+  -H 'Origin: http://localhost:3000' \
+  -H 'Access-Control-Request-Method: POST' \
+  -H 'Access-Control-Request-Headers: Authorization,Content-Type,X-Request-Id' \
+  http://localhost:8088/orders/api/orders/preview
+```
+
+验证 Header 灰度路由：
+
+```bash
+DEMO_GATEWAY_ROUTES_ORDER_CANARY_URI=http://localhost:8080 \
+./mvnw -pl gateway-service spring-boot:run
+
+curl -u user:user123 \
+  -H 'X-Canary: true' \
+  http://localhost:8088/orders/api/orders/admin/stats
+```
+
+`X-Canary: true` 会优先命中 `orders-canary-route`。当前示例使用独立 URI 模拟灰度后端；生产环境还需要配合发布平台、健康检查、熔断指标和快速回滚策略。详见 [Gateway 生产能力专题](gateway-production-playbook.md)。
+
+跨域配置位于 `spring.cloud.gateway.server.webflux.globalcors`。示例显式允许本地前端 origin，并对 allowed headers 使用 `*` 以兼容预检中声明的业务 header；allowed origins 不使用通配。
 
 限流配置位于 `gateway-service/src/main/resources/application.yml`：
 
@@ -1303,6 +1366,15 @@ docker compose -f observability/docker-compose.yml logs -f zipkin
 ```bash
 docker compose -f observability/docker-compose.yml down
 ```
+
+Prometheus 告警规则草案位于 `observability/prometheus/alert-rules.yml`，当前通过 `observability/prometheus/prometheus.yml` 的 `rule_files` 加载。规则覆盖服务存活、HTTP 5xx 比例、HTTP p95、订单 fallback 比例、Resilience4j 熔断器打开和 JVM heap 压力。本地没有接 Alertmanager，规则用于学习、查询和面试复盘：
+
+```bash
+curl -fsS 'http://localhost:9090/api/v1/rules' \
+  | jq -r '.data.groups[] | .name as $group | .rules[] | [$group, .name, .type, (.state // "-")] | @tsv'
+```
+
+更多 PromQL、SLO、label 基数、trace 采样和故障排查 runbook 见 [可观测性生产化专题](observability-production-playbook.md)。
 
 访问地址：
 

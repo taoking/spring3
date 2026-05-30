@@ -6,6 +6,8 @@
 
 本计划不直接改变业务运行路径。默认约束仍然是：默认 profile 保持轻量，不接入数据库和 Redis，除非后续单独明确变更项目边界。对数据库、Redis 这类资深面试高频但当前项目不接入的内容，先以设计文档、故障矩阵、面试题库和可选 future profile 方式补齐。
 
+整体评分、追问压力测试和补齐优先级详见：[资深面试覆盖度检查报告](../interview-coverage-assessment.md)。
+
 ## 当前结论
 
 当前项目已经达到“组件覆盖较全面、可演示、可测试”的阶段。下一步的重点不是继续堆新依赖，而是补足资深面试更看重的内容：
@@ -33,7 +35,7 @@
 | Kafka | profile、producer/consumer、manual ack、幂等、顺序、DLT | 中等偏深 | lag、rebalance、retry topic、producer transaction、EOS 边界 |
 | RabbitMQ | exchange/queue、listener retry、DLQ、幂等 | 中等 | publisher confirm、return callback、manual ack、prefetch、堆积排查 |
 | Docker / K8s | Dockerfile、Compose、最小 YAML、探针、资源限制 | 中等 | Ingress、HPA、Helm/Kustomize、GitOps、发布回滚 |
-| Native / AOT | `catalog-service` AOT、文档 | 入门 | native binary、RuntimeHints、动态代理、第三方库兼容 |
+| Native / AOT | `catalog-service` AOT、buildpacks native 镜像、RuntimeHints、health check | 中级 | order/gateway native、SpringDoc/Sentry/Feign 深度验证 |
 | Java 21 / 并发 | 虚拟线程 profile、线程观察接口 | 入门到中等 | pinned thread、JFR、线程池参数、MDC 传播、锁竞争 |
 | 数据一致性 | 当前不接数据库 | 明显缺口 | 事务、隔离级别、幂等表、outbox/inbox、分布式事务 |
 | Redis / 分布式缓存 | 当前不接 Redis | 明显缺口 | 缓存击穿/穿透/雪崩、双写一致性、分布式锁、热点 key |
@@ -52,6 +54,8 @@
 ### 1. 数据一致性与事务边界
 
 定位：资深 Java 面试硬缺口。当前不接数据库，但必须能讲清事务、幂等和消息一致性。
+
+实施状态：已完成设计型专题，见 [数据一致性与事务边界专题](../data-consistency-playbook.md) 和 [20 数据一致性与事务边界计划](20-data-consistency.md)。
 
 建议产物：
 
@@ -92,6 +96,8 @@
 
 定位：项目当前只有 Caffeine，本地缓存已覆盖，但 Redis 是资深 Java 高频。
 
+实施状态：已完成设计型专题，见 [Redis 与缓存治理专题](../redis-cache-playbook.md) 和 [21 Redis 与缓存治理计划](21-redis-cache.md)。
+
 建议产物：
 
 - `docs/redis-cache-playbook.md`
@@ -129,6 +135,8 @@
 
 定位：当前 JWT profile 是本地 HS256 学习模式，资深面试会追问真实 IdP 和服务间调用。
 
+实施状态：已完成生产化专题，见 [OAuth2 / JWT 生产化专题](../security-oauth2-playbook.md)。`jwt` profile 已预留 `issuer-uri` 和 `jwk-set-uri` 配置入口。
+
 建议产物：
 
 - 深化 `docs/task-plans/05-oauth2-jwt.md`
@@ -158,6 +166,8 @@
 ### 4. 可观测性生产化
 
 定位：当前有 metrics/logs/traces 基线，但生产追问会落到采样、告警、查询和排障闭环。
+
+实施状态：已完成生产化专题，见 [可观测性生产化专题](../observability-production-playbook.md) 和 [22 可观测性生产化计划](22-observability-production.md)。已新增 Prometheus 告警规则草案。
 
 建议产物：
 
@@ -196,6 +206,8 @@
 
 定位：网关已有基线，后续重点是生产职责边界和流量治理。
 
+实施状态：已完成生产能力专题，见 [Gateway 生产能力专题](../gateway-production-playbook.md) 和 [23 Gateway 生产能力计划](23-gateway-production.md)。已补 Spring Cloud Gateway 内置 `globalcors` CORS 预检配置、`X-Canary: true` 灰度路由、职责边界和自动化测试。
+
 建议产物：
 
 - 深化 `docs/task-plans/02-gateway.md`
@@ -228,6 +240,8 @@
 
 定位：RabbitMQ 和 Kafka 已有基线，下一步补生产细节和排障。
 
+实施状态：已完成设计型生产语义专题，见 [消息队列生产语义专题](../messaging-production-playbook.md) 和 [24 消息队列生产语义计划](24-messaging-production.md)。已补 Kafka lag/rebalance/retry topic/producer transaction 边界、RabbitMQ publisher confirm/manual ack/prefetch/堆积排查和 RocketMQ tag/顺序/延迟/事务半消息设计。
+
 建议内容：
 
 - Kafka retry topic 替代 blocking retry 的示例或设计说明。
@@ -246,10 +260,12 @@
 
 定位：当前虚拟线程只有入门示例，资深面试会追问诊断工具和线程模型。
 
+实施状态：已完成设计型诊断专题，见 [JVM、并发和 Java 21 诊断专题](../jvm-concurrency-playbook.md) 和 [25 JVM、并发和 Java 21 诊断计划](25-jvm-concurrency.md)。已补线程池参数、`CompletableFuture`、MDC/trace context、pinned thread、JFR、jcmd、jstack、jmap、GC log 和 CPU 高/线程阻塞/内存上涨/接口超时排查路径。
+
 建议产物：
 
 - `docs/jvm-concurrency-playbook.md`
-- `docs/task-plans/22-jvm-concurrency.md`
+- `docs/task-plans/25-jvm-concurrency.md`
 
 内容范围：
 
@@ -268,10 +284,12 @@
 
 定位：目前 CI 能跑测试，但资深工程能力还要体现质量门禁。
 
+实施状态：已完成设计型专题，见 [工程质量与 CI 门禁专题](../engineering-quality-playbook.md) 和 [26 工程质量与 CI 门禁计划](26-engineering-quality.md)。已补 CI 分层、JaCoCo、静态扫描、依赖安全、SBOM、镜像扫描、ArchUnit 规则候选和测试分层。
+
 建议产物：
 
 - `docs/engineering-quality-playbook.md`
-- `docs/task-plans/23-engineering-quality.md`
+- `docs/task-plans/26-engineering-quality.md`
 
 内容范围：
 
@@ -291,6 +309,8 @@
 
 ### 9. Kubernetes 生产化
 
+实施状态：已完成设计型专题，见 [Kubernetes 生产化专题](../kubernetes-production-playbook.md) 和 [27 Kubernetes 生产化计划](27-kubernetes-production.md)。已补 Ingress、HPA、PDB、ServiceMonitor、Secret 管理、镜像 tag/digest、GitOps、回滚和故障排查。
+
 建议内容：
 
 - Ingress、HPA、PDB、ServiceMonitor、startupProbe。
@@ -304,6 +324,8 @@
 - 不要求本地真实集群，但要给出 `kubectl` 验证命令和限制说明。
 
 ### 10. Native Image 完整验证
+
+实施状态：已完成 `catalog-service` buildpacks native 闭环，见 [Native Image 完整验证专题](../native-image-verification-playbook.md) 和 [28 Native Image 完整验证计划](28-native-image-verification.md)。本机 `native:compile` 仍受限于缺少 GraalVM `native-image`。
 
 建议内容：
 
@@ -329,7 +351,7 @@
 | 7 | JVM、并发和 Java 21 诊断 | P1 | 弥补 Java 基础和线上排障能力 |
 | 8 | 工程质量与 CI 门禁 | P1 | 展示工程负责人视角 |
 | 9 | Kubernetes 生产化 | P2 | 当前已有最小 YAML，按需推进 |
-| 10 | Native Image 完整验证 | P2 | 依赖本机工具链，适合后置 |
+| 10 | Native Image 完整验证 | P2 | buildpacks 闭环已完成，后续扩展到 order/gateway |
 
 ## 通用任务 Prompt 模板
 

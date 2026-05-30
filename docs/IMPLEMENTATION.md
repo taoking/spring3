@@ -30,7 +30,7 @@
 - `catalog-service` 可以通过 Spring Cloud Contract 生成 provider 验证测试和本地 `stubs` jar，`order-service` 可以使用 Stub Runner 消费 stubs 验证服务间契约。
 - `order-service` 可以通过 `-Prabbitmq` + `rabbitmq` profile 启用 RabbitMQ 订单预览事件示例，覆盖生产、消费、eventId 幂等、重试和死信队列。
 - `order-service` 可以通过 `-Pkafka` + `kafka` profile 启用 Kafka 订单预览事件示例，覆盖生产、消费、message key 分区顺序、manual ack、eventId 幂等、重试和 DLT。
-- `catalog-service` 可以完成 Spring AOT 处理，Native Image / AOT 构建命令、兼容注意事项和失败排查已文档化；native binary 编译不进入默认 CI。
+- `catalog-service` 可以完成 Spring AOT 处理，并已通过 Docker buildpacks 完成 native 镜像构建、容器启动和 health check；本机 native binary 编译不进入默认 CI。
 - `catalog-service` 和 `order-service` 有 Kubernetes 最小部署 YAML，覆盖 Deployment、Service、ConfigMap、Secret 示例、Actuator readiness/liveness、资源 requests/limits、滚动发布和优雅停机。
 - Nacos 作为可选专题补充，不影响默认 profile 的启动和测试。
 - 默认 profile 没有数据库、Redis、Kafka、RabbitMQ、RocketMQ 运行依赖；RabbitMQ 和 Kafka 仅作为隔离的可选 profile。
@@ -78,7 +78,7 @@
 - Sentinel 可选专题：通过 `-Psentinel` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=sentinel` 加载本地 Flow、ParamFlow、Degrade 规则。
 - RabbitMQ 可选专题：通过 `-Prabbitmq` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=rabbitmq` 加载 AMQP 连接、exchange、queue、DLQ 和 listener retry 配置。
 - Kafka 可选专题：通过 `-Pkafka` Maven profile 编译隔离源码，通过 `SPRING_PROFILES_ACTIVE=kafka` 加载 Kafka producer/consumer、topic、manual ack、重试和 DLT 配置。
-- Native Image / AOT：使用 Spring Boot parent 内置 `native` profile 做手动学习验证，当前以 `catalog-service` 为最小目标；本机已通过 `spring-boot:process-aot`，`native:compile` 因未安装 GraalVM `native-image` 而停止。
+- Native Image / AOT：使用 Spring Boot parent 内置 `native` profile 做手动学习验证，当前以 `catalog-service` 为最小目标；本机已通过 `spring-boot:process-aot` 和 Docker buildpacks native 镜像 health check，`native:compile` 因未安装 GraalVM `native-image` 而停止。
 - JSON 日志专题：`json-logging` profile 开启 `logging.structured.format.console=logstash` 和 `demo.observability.http-logging.enabled=true`。
 - API 治理专题：`common` 维护错误码常量，两个 Servlet 服务的 `ProblemDetail` 统一补充 `errorCode`、`requestId`、`timestamp`，订单服务提供 v1/v2 版本路由和旧路径废弃头。
 - 契约测试专题：`contract-test` Maven profile 启用 Spring Cloud Contract Verifier / Stub Runner，`catalog-service` 维护 provider 契约并生成 `stubs` classifier，`order-service` 使用本地 stubs 验证 consumer fallback 行为。
@@ -218,7 +218,7 @@ Consumer 侧：
 
 ### Native Image / AOT
 
-Native Image / AOT 不新增业务依赖，也不改变默认构建链路。Spring Boot starter parent `3.5.14` 已提供 `native` Maven profile，本项目只补充文档化命令和 `catalog-service` 最小验证路径。
+Native Image / AOT 不新增业务依赖，也不改变默认构建链路。Spring Boot starter parent `3.5.14` 已提供 `native` Maven profile，本项目用 `catalog-service` 完成最小 native 验证路径，并保留本机 GraalVM binary 构建说明。
 
 当前验证结果：
 
@@ -226,13 +226,21 @@ Native Image / AOT 不新增业务依赖，也不改变默认构建链路。Spri
 - `./mvnw -pl catalog-service -am package -DskipTests` 通过，说明普通 jar 构建不受影响。
 - `./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests` 通过，说明 `catalog-service` 可以完成 Spring AOT 处理。
 - `./mvnw -Pnative -pl catalog-service native:compile -DskipTests` 已尝试，当前本机失败原因是未安装 GraalVM `native-image`。
+- `./mvnw -Pnative -pl catalog-service spring-boot:build-image -DskipTests -Dspring-boot.build-image.imageName=spring3/catalog-service-native:local` 通过，生成 buildpacks native 镜像。
+- `docker run -d -p 18081:8081 -e TRACING_SAMPLING_PROBABILITY=0.0 --name spring3-catalog-native-test spring3/catalog-service-native:local` 启动后，`curl -i http://localhost:18081/actuator/health` 返回 `HTTP 200` 和 `UP`。
+
+native 兼容处理：
+
+- `catalog-service` 增加 `CatalogNativeRuntimeHints`，注册 Hibernate Validator / JBoss Logging 动态查找的 `Log_$logger` 和 `Messages_$bundle`。
+- 本次失败复盘路径为：先出现 `Invalid logger interface org.hibernate.validator.internal.util.logging.Log`，补 hints 后前进到 `Invalid bundle interface org.hibernate.validator.internal.util.logging.Messages`，继续补 hints 后容器启动通过。
+- native 容器日志显示启动耗时约 `0.322s`，native-image 阶段产物规模约 `129.89MB`，peak RSS 约 `5.19GB`。
 
 执行原则：
 
 - 先验证依赖最少的 `catalog-service`，再考虑 `order-service` 和 `gateway-service`。
 - 不把 native binary 构建加入默认 CI，避免普通反馈链路变慢。
 - 不直接对聚合依赖模块执行 `spring-boot:process-aot`，因为 `common` 和 starter 模块没有 main class。
-- SpringDoc、Sentry、OpenFeign、Gateway、Resilience4j、AOP 和 Jackson 的 native 兼容性需要在后续扩展时逐项验证。
+- SpringDoc、Sentry、OpenFeign、Gateway、Resilience4j、AOP 和 Jackson 的 native 兼容性需要在后续扩展到接口路径、`order-service` 和 `gateway-service` 时逐项验证。
 
 ### Kubernetes 部署示例
 
@@ -270,6 +278,7 @@ Prometheus 当前通过 Service/Pod 注解抓取 `/actuator/prometheus`。如果
 ./mvnw -Pcontract-test -pl catalog-service -am install
 ./mvnw -Pcontract-test -pl order-service -am -Dtest=OrderCatalogContractStubTest -Dsurefire.failIfNoSpecifiedTests=false test
 ./mvnw -Pnative -pl catalog-service spring-boot:process-aot -DskipTests
+./mvnw -Pnative -pl catalog-service spring-boot:build-image -DskipTests -Dspring-boot.build-image.imageName=spring3/catalog-service-native:local
 ./mvnw -Pkafka,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderKafkaProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
 kubeconform -strict -summary deployment/k8s/*.yaml
 ./mvnw package -DskipTests
@@ -374,7 +383,7 @@ docker compose -f platform/nacos/docker-compose.yml config
 - `order-service` 增加 `OrderRabbitMqProfileIT`，在 `rabbitmq` + `integration-test` profile 下用 Testcontainers 启动 `rabbitmq:3.13-management`，验证订单预览事件生产/消费、重复 eventId 幂等跳过和异常 SKU 重试后进入 DLQ。
 - `order-service` 增加 `OrderKafkaProfileIT`，在 `kafka` + `integration-test` profile 下用 Testcontainers 启动 `confluentinc/cp-kafka:7.6.1`，验证订单预览事件生产/消费、requestId/traceId 事件字段、重复 eventId 幂等跳过、同 key 顺序消费和异常 SKU 重试后进入 DLT。
 - `catalog-service` 增加 Spring Cloud Contract provider 测试，覆盖商品查询成功、`404 ProblemDetail` 和 `500 ProblemDetail` 的响应结构。
-- `catalog-service` 已执行 Spring AOT 处理验证；native binary 编译已记录本机缺少 GraalVM `native-image` 的失败原因和后续处理建议。
+- `catalog-service` 已执行 Spring AOT 处理验证；Docker buildpacks native 镜像已启动并通过 health check；本机 native binary 编译已记录缺少 GraalVM `native-image` 的失败原因和后续处理建议。
 - `deployment/k8s` 已通过 `kubeconform -strict -summary deployment/k8s/*.yaml` 校验，8 个资源全部有效；当前本机无 Kubernetes API server，`kubectl apply --dry-run=client` 会失败在 API discovery。
 - `gateway-service` 覆盖路由匹配、前缀改写、`Authorization` 透传、`X-Request-Id`、下游 `401` 透出、fallback、本地限流、health/prometheus。
 - `gateway-service` 增加 Testcontainers 集成测试，使用 `nginx:1.27.3-alpine` 作为容器化下游，覆盖真实 Gateway 路由到外部依赖的路径。

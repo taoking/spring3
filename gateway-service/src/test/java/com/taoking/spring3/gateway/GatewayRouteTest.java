@@ -3,6 +3,7 @@ package com.taoking.spring3.gateway;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -14,7 +15,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.cloud.gateway.config.GlobalCorsProperties;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -28,28 +32,39 @@ class GatewayRouteTest {
 
     private static MockWebServer catalogServer;
     private static MockWebServer orderServer;
+    private static MockWebServer orderCanaryServer;
 
     @Autowired
     private WebTestClient webTestClient;
+
+    @Autowired
+    private GlobalCorsProperties globalCorsProperties;
+
+    @LocalServerPort
+    private int port;
 
     @BeforeAll
     static void startBackends() throws IOException {
         catalogServer = new MockWebServer();
         orderServer = new MockWebServer();
+        orderCanaryServer = new MockWebServer();
         catalogServer.start();
         orderServer.start();
+        orderCanaryServer.start();
     }
 
     @AfterAll
     static void stopBackends() throws IOException {
         catalogServer.shutdown();
         orderServer.shutdown();
+        orderCanaryServer.shutdown();
     }
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
         registry.add("demo.gateway.routes.catalog-uri", () -> backendUrl(catalogServer));
         registry.add("demo.gateway.routes.order-uri", () -> backendUrl(orderServer));
+        registry.add("demo.gateway.routes.order-canary-uri", () -> backendUrl(orderCanaryServer));
     }
 
     @Test
@@ -111,6 +126,48 @@ class GatewayRouteTest {
                 .expectBody()
                 .jsonPath("$.title").isEqualTo("Gateway fallback")
                 .jsonPath("$.service").isEqualTo("orders");
+    }
+
+    @Test
+    void orderCanaryRouteUsesCanaryBackendWhenHeaderMatches() throws Exception {
+        orderCanaryServer.enqueue(jsonResponse("""
+                {"version":"canary"}
+                """));
+
+        webTestClient.get()
+                .uri("/orders/api/orders/admin/stats")
+                .header("X-Canary", "true")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.version").isEqualTo("canary");
+
+        RecordedRequest request = orderCanaryServer.takeRequest(1, TimeUnit.SECONDS);
+        assertThat(request).isNotNull();
+        assertThat(request.getPath()).isEqualTo("/api/orders/admin/stats");
+    }
+
+    @Test
+    void corsPreflightAllowsConfiguredLocalOrigins() {
+        assertThat(globalCorsProperties.getCorsConfigurations()).containsKey("/**");
+        var corsConfiguration = globalCorsProperties.getCorsConfigurations().get("/**");
+        assertThat(corsConfiguration.checkOrigin("http://localhost:3000")).isEqualTo("http://localhost:3000");
+        assertThat(corsConfiguration.checkHttpMethod(HttpMethod.POST)).contains(HttpMethod.POST);
+        assertThat(corsConfiguration.checkHeaders(List.of("Authorization", "Content-Type", "X-Request-Id")))
+                .contains("Authorization", "Content-Type", "X-Request-Id");
+
+        webTestClient.options()
+                .uri("http://localhost:" + port + "/orders/api/orders/preview")
+                .header(HttpHeaders.ORIGIN, "http://localhost:3000")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name())
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Authorization,Content-Type,X-Request-Id")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:3000")
+                .expectHeader().value(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS,
+                        value -> assertThat(value).contains("POST"))
+                .expectHeader().value(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS,
+                        value -> assertThat(value).contains("Authorization"));
     }
 
     @Test

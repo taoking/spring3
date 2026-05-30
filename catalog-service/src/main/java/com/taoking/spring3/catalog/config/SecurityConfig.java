@@ -27,6 +27,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtDecoders;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
@@ -88,6 +89,12 @@ class SecurityConfig {
     @Bean
     @ConditionalOnProperty(prefix = "demo.security", name = "mode", havingValue = "jwt")
     JwtDecoder jwtDecoder(JwtProperties properties) {
+        if (StringUtils.hasText(properties.jwkSetUri())) {
+            return NimbusJwtDecoder.withJwkSetUri(properties.jwkSetUri()).build();
+        }
+        if (StringUtils.hasText(properties.issuerUri())) {
+            return JwtDecoders.fromIssuerLocation(properties.issuerUri());
+        }
         byte[] secret = properties.secret().getBytes(StandardCharsets.UTF_8);
         Assert.isTrue(secret.length >= 32, "demo.security.jwt.secret must be at least 32 bytes for HS256");
         SecretKey key = new SecretKeySpec(secret, "HmacSHA256");
@@ -154,7 +161,7 @@ class SecurityConfig {
     }
 
     @ConfigurationProperties(prefix = "demo.security.jwt")
-    record JwtProperties(String secret) {
+    record JwtProperties(String secret, String issuerUri, String jwkSetUri) {
 
         JwtProperties {
             secret = StringUtils.hasText(secret) ? secret : DEFAULT_JWT_SECRET;

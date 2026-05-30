@@ -1,6 +1,6 @@
 # 消息队列专题路线
 
-当前项目已完成 RabbitMQ 和 Kafka 可选基线：默认 profile 不引入消息队列依赖，只有同时使用对应 Maven profile 和 Spring profile 时才启用。
+当前项目已完成 RabbitMQ 和 Kafka 可选基线：默认 profile 不引入消息队列依赖，只有同时使用对应 Maven profile 和 Spring profile 时才启用。生产语义、故障处理、排障流程和面试追问见 [消息队列生产语义专题](messaging-production-playbook.md) 和 [24 消息队列生产语义计划](task-plans/24-messaging-production.md)。
 
 ## 当前 RabbitMQ 示例
 
@@ -57,7 +57,7 @@ SPRING_PROFILES_ACTIVE=rabbitmq ./mvnw -Prabbitmq -pl order-service spring-boot:
 | 指标 | 发布、发送失败、消费成功、重复、失败分别有 Micrometer Counter |
 | 测试 | `OrderKafkaProfileIT` 使用 Testcontainers Kafka 覆盖生产消费、幂等、同 key 顺序和 DLT |
 
-后续建议学习：
+生产语义已补充：
 
 - producer transaction、read-process-write exactly-once 边界。
 - retry topic 和 blocking retry 的取舍。
@@ -82,7 +82,7 @@ SPRING_PROFILES_ACTIVE=rabbitmq ./mvnw -Prabbitmq -pl order-service spring-boot:
 - 消费端基于 `eventId` 的幂等。
 - Testcontainers 集成测试。
 
-后续可继续补：
+生产语义已补充：
 
 - publisher confirm 和 return callback 的自动化验证。
 - 手动 ack/nack 与 `AcknowledgeMode.MANUAL`。
@@ -94,7 +94,7 @@ SPRING_PROFILES_ACTIVE=rabbitmq ./mvnw -Prabbitmq -pl order-service spring-boot:
 
 适合事务消息、顺序消息、大规模业务消息和国内生态常见中间件场景。
 
-后续建议学习：
+设计专题已补充：
 
 - topic、tag、consumer group。
 - 普通消息、顺序消息、延时消息、事务消息。

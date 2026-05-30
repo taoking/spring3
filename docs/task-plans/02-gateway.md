@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-已实现。后续如果继续扩展，可以补充跨域、灰度路由、JWT Resource Server、分布式限流和更完整的网关指标看板。
+已实现。2026-05-15 已继续补充 CORS 预检配置、`X-Canary: true` 灰度路由、生产化职责边界和测试，详见 [Gateway 生产能力计划](23-gateway-production.md) 和 [Gateway 生产能力专题](../gateway-production-playbook.md)。后续如果继续扩展，可以补充分布式限流真实 Redis 实现、JWT Resource Server 网关认证和更完整的网关指标看板。
 
 ## 验证记录
 

@@ -21,7 +21,7 @@
 - Spring Boot 3.5.14
 - Spring Cloud 2025.0.2
 - Maven 多模块 + Maven Wrapper
-- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI、Spring Cloud Contract、RabbitMQ/Kafka 可选 profile、Spring AOT / Native Image 专题、自定义 starter / autoconfigure
+- Spring Web MVC、WebFlux Gateway、Validation、Security、OAuth2 Resource Server / JWT、OpenFeign、RestClient、Resilience4j、Caffeine、Actuator、Micrometer Prometheus、Micrometer Tracing、Zipkin、Sentry、SpringDoc OpenAPI、Spring Cloud Contract、RabbitMQ/Kafka 可选 profile、Spring AOT / Native Image buildpacks 验证、自定义 starter / autoconfigure
 
 ## 快速启动
 
@@ -146,16 +146,20 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - 自定义 starter / autoconfigure：已新增 `demo-observability-autoconfigure` 和 `demo-observability-spring-boot-starter`，用 `@AutoConfiguration` 自动装配 `@DemoLog` AOP，并覆盖条件装配、属性绑定、禁用开关和用户 Bean 覆盖测试。
 - Resilience4j 深化：已补充 Retry、CircuitBreaker、TimeLimiter、RateLimiter、Bulkhead 触发参数、fallback 响应和 Prometheus 指标验证。
 - Testcontainers / CI：已新增 GitHub Actions workflow，默认跑 `./mvnw test`，Docker job 跑 `./mvnw -Pintegration-test verify`；Gateway 集成测试使用固定版本 Nginx 容器验证真实下游路由。
+- 工程质量与 CI 门禁：已补 [工程质量与 CI 门禁专题](docs/engineering-quality-playbook.md)，覆盖 CI 分层、JaCoCo、静态扫描、依赖安全、SBOM、镜像扫描和 ArchUnit 规则候选。
 - Docker 镜像与部署：已新增 `catalog-service`、`order-service` Dockerfile 和 `deployment/docker-compose.yml`，容器网络内使用服务名调用，并提供 Prometheus 服务名抓取配置。
 - Java 21 虚拟线程：已新增 `virtual-thread` profile、虚拟线程版 `demoTaskExecutor`、阻塞 I/O 观察接口和 profile 回归测试；默认 profile 仍使用传统线程池。
+- JVM、并发和 Java 21 诊断：已补 [JVM、并发和 Java 21 诊断专题](docs/jvm-concurrency-playbook.md)，覆盖线程池、`CompletableFuture`、pinned thread、JFR、jcmd、jstack、jmap、GC log 和故障排查路径。
 - Sentinel：已新增独立 `sentinel` Maven/Spring profile、本地内存规则、QPS 限流、热点参数、慢调用熔断探针和 profile 回归测试；默认 profile 不引入 Sentinel 依赖。
 - 结构化日志：已新增 `json-logging` profile，使用 Spring Boot 3.5 内建 structured logging 输出 JSON，并补充 requestId、traceId、spanId、status、elapsedMs 和敏感头脱敏测试。
 - API 治理：已补充 ProblemDetail 稳定错误码、requestId、timestamp、订单 v1/v2 示例、旧接口废弃头和 OpenAPI 分组。
 - Spring Cloud Contract：已补充 `catalog-service` provider 契约、生成 stubs jar、`order-service` consumer Stub Runner 测试，覆盖成功、商品不存在和模拟失败三类下游响应。
 - RabbitMQ 消息队列：已新增可选 `rabbitmq` Maven/Spring profile、本地 Compose、订单预览事件发布/消费、eventId 幂等、消费重试和 DLQ，以及 Testcontainers 集成测试；默认运行路径不引入 MQ。
 - Kafka 消息队列：已新增可选 `kafka` Maven/Spring profile、本地 Compose、订单预览事件发布/消费、message key 分区顺序、manual ack、eventId 幂等、消费重试和 DLT，以及 Testcontainers 集成测试；默认运行路径不引入 Kafka。
-- Native Image / AOT：已补充 `catalog-service` 最小 AOT 验证、native binary / buildpacks 构建命令、第三方库兼容注意事项和排障说明；当前本机 native 编译阻塞于未安装 GraalVM `native-image`。
+- 消息队列生产语义：已补充 Kafka/RabbitMQ/RocketMQ 的可靠投递、顺序、幂等、重试、DLT/DLQ、lag/堆积排查和事务边界，见 [消息队列生产语义专题](docs/messaging-production-playbook.md)。
+- Native Image / AOT：已补充 `catalog-service` AOT、Docker buildpacks native 镜像、容器启动和 health check 闭环；当前本机 `native:compile` 仍阻塞于未安装 GraalVM `native-image`，但 buildpacks 路径已验证通过。
 - Kubernetes：已新增 `deployment/k8s` 最小部署示例，覆盖 Namespace、ConfigMap、Secret 示例、Deployment、Service、Actuator readiness/liveness、资源 requests/limits、滚动发布、优雅停机和 Prometheus 抓取注解。
+- Kubernetes 生产化：已补 [Kubernetes 生产化专题](docs/kubernetes-production-playbook.md)，覆盖 Ingress、HPA、PDB、ServiceMonitor、Secret 管理、镜像 tag/digest、GitOps、回滚和故障排查。
 
 ### 后续计划
 
@@ -163,14 +167,14 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 
 #### P0：优先补充
 
-- 资深面试覆盖补齐总计划：已按架构师/面试官视角补充覆盖评估、缺口、追问和执行 prompt，见 [资深面试覆盖补齐计划](docs/task-plans/19-interview-expansion.md)。
-- 数据一致性与事务边界：当前项目不接数据库，后续先补事务传播、隔离级别、幂等、outbox/inbox、补偿和对账的设计型专题。
-- Redis 与缓存治理：当前仅有 Caffeine，后续先补 Redis 缓存一致性、穿透/击穿/雪崩、分布式锁、热点 key 和限流计数设计专题。
+- 资深面试覆盖度检查：已按架构师/面试官视角补充整体评分、追问压力测试和补齐优先级，见 [资深面试覆盖度检查报告](docs/interview-coverage-assessment.md)；可执行任务 prompt 见 [资深面试覆盖补齐计划](docs/task-plans/19-interview-expansion.md)。
+- 数据一致性与事务边界：当前项目不接数据库，已补 [数据一致性与事务边界专题](docs/data-consistency-playbook.md)，覆盖事务传播、隔离级别、幂等、outbox/inbox、补偿和对账的设计型内容。
+- Redis 与缓存治理：当前仅有 Caffeine，已补 [Redis 与缓存治理专题](docs/redis-cache-playbook.md)，覆盖缓存一致性、穿透/击穿/雪崩、分布式锁、热点 key 和限流计数设计内容。
 - Nacos 深化：已完成 `nacos` profile、服务注册发现、启动期配置中心读取；后续补动态刷新、namespace/group 多环境隔离和 Testcontainers 集成测试。
-- Spring Cloud Gateway 深化：已完成 `gateway-service`、静态/Nacos 路由、过滤器、鉴权透传、限流和 fallback；后续可补灰度路由、跨域和更贴近生产的分布式限流。
-- 链路追踪深化：已完成 Micrometer Tracing + Zipkin 基线；后续可补 Tempo / OpenTelemetry Collector、采样策略、trace 与日志平台联查。
+- Spring Cloud Gateway 深化：已完成 `gateway-service`、静态/Nacos 路由、过滤器、鉴权透传、限流、fallback、CORS 和 `X-Canary` 灰度路由；已补 [Gateway 生产能力专题](docs/gateway-production-playbook.md)。
+- 链路追踪 / 可观测性生产化：已完成 Micrometer Tracing + Zipkin 基线；已补 [可观测性生产化专题](docs/observability-production-playbook.md)、PromQL 查询、Prometheus 告警规则草案和故障排查 runbook。
 - RestClient / `@HttpExchange`：已补充 RestClient 调用模式、统一 fallback、超时配置和选型对比；后续可补 `@HttpExchange` 声明式接口示例。
-- OAuth2 Resource Server / JWT：已完成 JWT profile、Bearer token 验证、角色映射和测试；后续可补对接真实 IdP、JWK Set 和 client_credentials 服务间 token。
+- OAuth2 Resource Server / JWT：已完成 JWT profile、Bearer token 验证、角色映射和测试；已补 [OAuth2 / JWT 生产化专题](docs/security-oauth2-playbook.md)，预留真实 IdP 的 `issuer-uri` / `jwk-set-uri` 配置入口，并沉淀 JWK rotation 和 `client_credentials` 服务间 token 设计。
 - 自动配置原理：已完成演示型 observability starter；后续可补源码阅读笔记和更多条件装配案例。
 - Resilience4j 深化：已完成 Retry、RateLimiter、Bulkhead、TimeLimiter、CircuitBreaker 治理矩阵；后续可补更贴近生产的异常分类、舱壁线程池和告警规则。
 - Testcontainers / 集成测试：已完成 Gateway 下游容器集成测试和 GitHub Actions；后续可扩展到 Nacos 或追踪后端。
@@ -178,17 +182,18 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 #### P1：建议补充
 
 - Docker 镜像与部署：已完成两个业务服务镜像、应用 Compose、readiness/liveness、优雅停机、JVM 参数和容器网络 Prometheus；后续可补镜像 SBOM 和 registry 发布流程。
-- Java 21 虚拟线程：已完成 `virtual-thread` profile、请求线程和 `@Async` 线程观察接口；后续可补简单并发脚本和 pinned thread 诊断示例。
+- Java 21 虚拟线程 / JVM 诊断：已完成 `virtual-thread` profile、请求线程和 `@Async` 线程观察接口；已补 [JVM、并发和 Java 21 诊断专题](docs/jvm-concurrency-playbook.md)，覆盖 pinned thread、线程池、JFR、jcmd、jstack、jmap 和 GC 排障。
 - Sentinel：已完成可选 `sentinel` profile、QPS 限流、热点参数、慢调用熔断探针和 Resilience4j 对比；后续可补 Dashboard/Nacos 动态规则和集群限流。
 - 结构化日志：已完成 `json-logging` profile、Servlet 请求日志过滤器、Gateway 结构化审计字段和敏感头脱敏；后续可补 Loki/ELK 查询样例和统一错误码字段。
 - API 治理：已完成稳定错误码、版本路由、废弃响应头、OpenAPI 分组和兼容策略说明；后续可补接口变更 changelog 模板。
 - Spring Cloud Contract：已完成 catalog/order 契约测试基线；后续可补契约发布到制品库、CI consumer matrix 和 breaking change 演示。
+- 工程质量与 CI 门禁：已补 [工程质量与 CI 门禁专题](docs/engineering-quality-playbook.md)，后续可按需实装 ArchUnit、JaCoCo 报告、SBOM 和依赖安全扫描。
 
 #### P2：路线保留
 
-- Kafka、RabbitMQ、RocketMQ：RabbitMQ 和 Kafka 基线已完成；后续可继续补 Kafka producer transaction、retry topic、consumer lag 面板、RabbitMQ publisher confirm 深化；RocketMQ 保留 tag/顺序/事务消息路线。
-- Native Image / AOT：已补充专题文档和 `catalog-service` AOT 基线；后续可在安装 GraalVM 后继续验证 native binary，并逐步扩展到 `order-service`。
-- Kubernetes：已补最小 YAML 和使用说明；后续可按真实集群补 Ingress、HPA、ServiceMonitor CRD、镜像 registry 发布和 GitOps 流程。
+- Kafka、RabbitMQ、RocketMQ：RabbitMQ 和 Kafka 基线已完成；已补 [消息队列生产语义专题](docs/messaging-production-playbook.md)，覆盖 Kafka producer transaction 边界、retry topic、consumer lag、RabbitMQ publisher confirm/manual ack/prefetch 和 RocketMQ tag/顺序/事务消息设计。
+- Native Image / AOT：已补充专题文档、`catalog-service` RuntimeHints 示例和 buildpacks native 镜像验证；后续可在安装 GraalVM 后补本机 binary，并逐步扩展到 `order-service` / `gateway-service`。
+- Kubernetes：已补最小 YAML 和使用说明；已补 [Kubernetes 生产化专题](docs/kubernetes-production-playbook.md)，覆盖 Ingress、HPA、PDB、ServiceMonitor CRD、镜像 registry 发布和 GitOps 流程。
 
 详见：
 
@@ -196,10 +201,26 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - [实施文档](docs/IMPLEMENTATION.md)
 - [Nacos 补充专题](docs/nacos-playbook.md)
 - [Native Image / AOT 专题](docs/native-aot.md)
+- [Native Image 完整验证专题](docs/native-image-verification-playbook.md)
 - [Kubernetes 部署示例](docs/kubernetes.md)
+- [Kubernetes 生产化专题](docs/kubernetes-production-playbook.md)
 - [Spring Boot 3 面试补充路线](docs/interview-roadmap.md)
+- [资深面试覆盖度检查报告](docs/interview-coverage-assessment.md)
 - [后续任务计划 Prompt 索引](docs/task-plans/README.md)
 - [资深面试覆盖补齐计划](docs/task-plans/19-interview-expansion.md)
+- [数据一致性与事务边界专题](docs/data-consistency-playbook.md)
+- [Redis 与缓存治理专题](docs/redis-cache-playbook.md)
+- [OAuth2 / JWT 生产化专题](docs/security-oauth2-playbook.md)
+- [可观测性生产化专题](docs/observability-production-playbook.md)
+- [Gateway 生产能力专题](docs/gateway-production-playbook.md)
+- [JVM、并发和 Java 21 诊断专题](docs/jvm-concurrency-playbook.md)
+- [工程质量与 CI 门禁专题](docs/engineering-quality-playbook.md)
 - [消息队列后续计划](docs/messaging-roadmap.md)
+- [消息队列生产语义专题](docs/messaging-production-playbook.md)
 - [Kafka 使用与面试专题](docs/kafka-playbook.md)
 - [Kafka 专题计划](docs/task-plans/18-kafka.md)
+- [消息队列生产语义计划](docs/task-plans/24-messaging-production.md)
+- [JVM、并发和 Java 21 诊断计划](docs/task-plans/25-jvm-concurrency.md)
+- [工程质量与 CI 门禁计划](docs/task-plans/26-engineering-quality.md)
+- [Kubernetes 生产化计划](docs/task-plans/27-kubernetes-production.md)
+- [Native Image 完整验证计划](docs/task-plans/28-native-image-verification.md)
