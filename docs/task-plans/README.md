@@ -43,6 +43,7 @@
 | 26 | 工程质量与 CI 门禁（设计专题已完成） | [26-engineering-quality.md](26-engineering-quality.md) | P1 |
 | 27 | Kubernetes 生产化（设计专题已完成） | [27-kubernetes-production.md](27-kubernetes-production.md) | P2 |
 | 28 | Native Image 完整验证（catalog buildpacks 闭环已完成） | [28-native-image-verification.md](28-native-image-verification.md) | P2 |
+| 29 | Kafka 学习与项目场景实施总计划 | [29-kafka-learning-and-project-scenarios.md](29-kafka-learning-and-project-scenarios.md) | P0 |
 
 ## 通用执行约束
 

@@ -41,6 +41,26 @@ demo:
       listener-concurrency: ${ORDER_KAFKA_LISTENER_CONCURRENCY:3}
       retry-backoff: ${ORDER_KAFKA_RETRY_BACKOFF:100ms}
       retry-max-attempts: ${ORDER_KAFKA_RETRY_MAX_ATTEMPTS:1}
+  kafka:
+    examples:
+      topic: ${KAFKA_DEMO_TOPIC:spring3.kafka-demo.events.v1}
+      retry-input-topic: ${KAFKA_DEMO_RETRY_INPUT_TOPIC:spring3.kafka-demo.retry.input.v1}
+      retry-topic: ${KAFKA_DEMO_RETRY_TOPIC:spring3.kafka-demo.retry.wait.v1}
+      retry-dlt-topic: ${KAFKA_DEMO_RETRY_DLT_TOPIC:spring3.kafka-demo.retry.dlt.v1}
+      schema-topic: ${KAFKA_DEMO_SCHEMA_TOPIC:spring3.kafka-demo.schema.v1}
+      transaction-input-topic: ${KAFKA_DEMO_TX_INPUT_TOPIC:spring3.kafka-demo.tx.input.v1}
+      transaction-audit-topic: ${KAFKA_DEMO_TX_AUDIT_TOPIC:spring3.kafka-demo.tx.audit.v1}
+      lag-topic: ${KAFKA_DEMO_LAG_TOPIC:spring3.kafka-demo.lag.v1}
+      consumer-group: ${KAFKA_DEMO_CONSUMER_GROUP:spring3-kafka-demo}
+      retry-consumer-group: ${KAFKA_DEMO_RETRY_CONSUMER_GROUP:spring3-kafka-demo-retry}
+      schema-consumer-group: ${KAFKA_DEMO_SCHEMA_CONSUMER_GROUP:spring3-kafka-demo-schema}
+      transaction-consumer-group: ${KAFKA_DEMO_TX_CONSUMER_GROUP:spring3-kafka-demo-tx}
+      lag-consumer-group: ${KAFKA_DEMO_LAG_CONSUMER_GROUP:spring3-kafka-demo-lag}
+      partitions: ${KAFKA_DEMO_PARTITIONS:3}
+      replication-factor: ${KAFKA_DEMO_REPLICATION_FACTOR:1}
+      retry-max-attempts: ${KAFKA_DEMO_RETRY_MAX_ATTEMPTS:2}
+      max-processing-delay: ${KAFKA_DEMO_MAX_PROCESSING_DELAY:5s}
+      transaction-id-prefix: ${KAFKA_DEMO_TRANSACTION_ID_PREFIX:spring3-kafka-demo-tx-}
 
 management:
   health:

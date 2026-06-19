@@ -59,6 +59,11 @@
 | `platform/rabbitmq/docker-compose.yml` | 本地 RabbitMQ + Management UI |
 | `platform/kafka/docker-compose.yml` | 本地 Kafka + Kafka UI |
 | `docs/kafka-playbook.md` | Kafka 使用、事件设计、测试和面试复盘 |
+| `docs/kafka-learning-guide.md` | Kafka 资深后端学习指南，覆盖核心模型、原理、使用、生产语义和治理 |
+| `docs/kafka-project-scenarios.md` | 当前项目 Kafka 场景实施文档 |
+| `docs/kafka-interview-question-bank.md` | Kafka 资深后端面试追问题库 |
+| `docs/kafka-operations-runbook.md` | Kafka lag、rebalance、DLT、broker 故障和重放 runbook |
+| `docs/kafka-coverage-review.md` | Kafka 资深面试覆盖度复查 |
 | `docs/messaging-production-playbook.md` | Kafka/RabbitMQ/RocketMQ 生产语义、故障处理和面试追问 |
 | `docs/jvm-concurrency-playbook.md` | JVM、线程池、虚拟线程、JFR/jcmd/jstack/jmap 和故障排查 |
 | `docs/engineering-quality-playbook.md` | CI 分层、覆盖率、静态扫描、依赖安全、SBOM、镜像扫描和 ArchUnit |
@@ -124,7 +129,7 @@ Docker Desktop 可用时运行 Testcontainers 集成测试：
 ./mvnw -Pkafka,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderKafkaProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
 ```
 
-`integration-test` Maven profile 使用 Failsafe 执行 `**/*IT.java`，普通 `./mvnw test` 不会启动容器。当前 `GatewayNginxContainerIT` 使用固定镜像 `nginx:1.27.3-alpine` 模拟真实下游服务，`OrderRabbitMqProfileIT` 使用固定镜像 `rabbitmq:3.13-management` 验证消息生产、消费、幂等和 DLQ，`OrderKafkaProfileIT` 使用固定镜像 `confluentinc/cp-kafka:7.6.1` 验证 Kafka 生产消费、幂等、顺序和 DLT。RabbitMQ/Kafka IT 还需要额外启用对应 Maven profile，所以默认 `./mvnw -Pintegration-test verify` 不会引入 MQ 依赖。Docker 不可用时，Testcontainers 测试会通过 `disabledWithoutDocker` 跳过；本地需要先启动 Docker Desktop。
+`integration-test` Maven profile 使用 Failsafe 执行 `**/*IT.java`，普通 `./mvnw test` 不会启动容器。当前 `GatewayNginxContainerIT` 使用固定镜像 `nginx:1.27.3-alpine` 模拟真实下游服务，`OrderRabbitMqProfileIT` 使用固定镜像 `rabbitmq:3.13-management` 验证消息生产、消费、幂等和 DLQ，`OrderKafkaProfileIT` 使用固定镜像 `confluentinc/cp-kafka:7.6.1` 验证 Kafka 生产消费、幂等、顺序、DLT、retry topic、Schema V2 兼容、lag 和事务 commit/abort 可见性。RabbitMQ/Kafka IT 还需要额外启用对应 Maven profile，所以默认 `./mvnw -Pintegration-test verify` 不会引入 MQ 依赖。Docker 不可用时，Testcontainers 测试会通过 `disabledWithoutDocker` 跳过；本地需要先启动 Docker Desktop。
 
 工程质量门禁、覆盖率、静态扫描、依赖安全、SBOM、镜像扫描和 ArchUnit 规则候选见 [工程质量与 CI 门禁专题](engineering-quality-playbook.md)。
 
@@ -845,6 +850,8 @@ Kafka 是可选消息队列专题，默认 profile 不引入 Kafka 运行依赖�
 | 重试/DLT | `DefaultErrorHandler` + `DeadLetterPublishingRecoverer`，重试耗尽后进入 DLT |
 | 指标 | `orders.preview.kafka.published.total`、`processed.total`、`duplicates.total`、`failed.total`、`send.failed.total` |
 
+`/api/kafka-demo` 还提供独立 demo lab，用代码演示 Kafka 基础模型、重复消费、幂等、顺序、retry topic、DLT、lag、rebalance 状态、Schema V2 兼容、事务 commit/abort 可见性、安全模板、容量规划和 Kafka/RabbitMQ/RocketMQ 选型。
+
 本地 Kafka：
 
 ```bash
@@ -889,6 +896,24 @@ curl -u user:user123 \
   http://localhost:8080/api/orders/preview
 ```
 
+Kafka demo lab：
+
+```bash
+curl -u user:user123 -X POST http://localhost:8080/api/kafka-demo/state/reset
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/basic?key=demo-basic'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/duplicates?eventId=demo-dup-1&key=demo-dup'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/ordered?key=order-1001&count=3'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/retry-topic?key=retry-1001&failUntilAttempt=2'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/lag?key=lag-1001&count=20&processingDelayMs=200'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/schema-v2?key=schema-1001'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/transaction/commit?key=tx-commit-1001'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/transaction/abort?key=tx-abort-1001'
+curl -u user:user123 http://localhost:8080/api/kafka-demo/state
+curl -u user:user123 'http://localhost:8080/api/kafka-demo/capacity-plan?peakMessagesPerSecond=5000&consumerMessageCostMs=20&targetPartitionThroughput=1000'
+curl -u user:user123 http://localhost:8080/api/kafka-demo/security-template
+curl -u user:user123 http://localhost:8080/api/kafka-demo/selection-matrix
+```
+
 查看指标：
 
 ```bash
@@ -903,6 +928,8 @@ curl -u user:user123 http://localhost:8080/actuator/metrics/orders.preview.kafka
 ./mvnw -Pkafka -pl order-service -am test -DskipTests
 ./mvnw -Pkafka,integration-test -pl order-service -am -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OrderKafkaProfileIT -Dfailsafe.failIfNoSpecifiedTests=false verify
 ```
+
+`OrderKafkaProfileIT` 会同时验证订单预览 Kafka 主链路和 demo lab：重复消费、同 key 顺序、Schema V2 兼容、lag 慢消费、retry topic 到 DLT、事务 commit 可见和 abort 不可见。
 
 停止 Kafka：
 

@@ -2,7 +2,17 @@
 
 Kafka 是当前项目的可选消息队列专题。默认 profile 不引入 Kafka 运行依赖，只有同时使用 Maven `-Pkafka` 和 Spring `SPRING_PROFILES_ACTIVE=kafka` 时，才会编译并启用 `order-service/src/kafka/java` 下的发布者、消费者和 topic 配置。
 
-## 当前示例
+## 深化文档入口
+
+面向资深后端学习和面试的 Kafka 文档已拆分为：
+
+- [Kafka 资深后端学习指南](kafka-learning-guide.md)：系统学习 Kafka 核心模型、读写链路、可靠性、顺序、幂等、事务、Schema、Spring Kafka 和生产治理。
+- [Kafka 项目场景实施文档](kafka-project-scenarios.md)：把当前订单预览事件链路拆成 producer、consumer、offset、幂等、顺序、DLT、lag、Schema、事务、安全和性能场景。
+- [Kafka 资深后端面试追问题库](kafka-interview-question-bank.md)：覆盖 30 个高频问题的一问、二问、三问和项目回答模板。
+- [Kafka 运维排障 Runbook](kafka-operations-runbook.md)：覆盖 lag、rebalance、DLT、producer 失败、broker 故障和安全重放。
+- [Kafka 资深面试覆盖度复查](kafka-coverage-review.md)：检查已落地能力、设计型能力、面试覆盖度和后续补齐优先级。
+
+## 当前业务示例
 
 围绕订单预览事件 `OrderPreviewCreatedEvent` 构建 Kafka 事件流：
 
@@ -21,6 +31,25 @@ Kafka 是当前项目的可选消息队列专题。默认 profile 不引入 Kafk
 | 测试 | `OrderKafkaProfileIT` 使用 Testcontainers Kafka |
 
 当前幂等 store 是内存实现，只适合学习和自动化测试。生产环境必须使用数据库唯一键、inbox/outbox、Redis、compact topic 或其他持久化机制。本项目明确不接入数据库和 Redis。
+
+## Kafka Demo Lab
+
+`order-service/src/kafka/java/com/taoking/spring3/order/messaging/kafka/KafkaDemo*` 提供一组独立于订单业务的代码演示端点，用来覆盖资深面试常问的 Kafka 场景。
+
+| 能力 | 入口 | 代码证据 |
+| --- | --- | --- |
+| 基础模型 | `POST /api/kafka-demo/basic` | 发送 `KafkaDemoEvent`，状态里可看 topic/partition/offset/group |
+| 重复消费和幂等 | `POST /api/kafka-demo/duplicates` | 同一 `eventId` 连发两次，consumer 只把第一次记为有效 |
+| 同 key 顺序 | `POST /api/kafka-demo/ordered` | 同一 key 的事件按 `sequence` 进入同一 partition |
+| manual retry topic 和 DLT | `POST /api/kafka-demo/retry-topic` | 失败进入 retry topic，超过 attempt 后进入 retry DLT |
+| lag 和 rebalance 观测 | `POST /api/kafka-demo/lag`、`GET /api/kafka-demo/state` | 慢消费累积处理状态，listener 记录 assigned/revoked |
+| Schema V2 兼容 | `POST /api/kafka-demo/schema-v2` | V1 视角 consumer 读取 V2 JSON，忽略新增可选字段 |
+| Kafka 事务边界 | `POST /api/kafka-demo/transaction/commit`、`POST /api/kafka-demo/transaction/abort` | `read_committed` consumer 可见已提交事务，看不到 abort 事务 |
+| 安全模板 | `GET /api/kafka-demo/security-template` | 返回 SASL/ACL 配置模板，不包含真实密钥 |
+| 容量规划 | `GET /api/kafka-demo/capacity-plan` | 按峰值、单条处理耗时和目标分区吞吐估算 partitions |
+| MQ 选型 | `GET /api/kafka-demo/selection-matrix` | 对比 Kafka、RabbitMQ、RocketMQ 和同步调用 |
+
+事务 demo 只证明 Kafka 事务提交/回滚与 `isolation.level=read_committed` 的可见性边界；它不是订单业务 exactly-once，也没有把数据库、HTTP 或消费 offset 纳入同一个业务事务。
 
 ## 本地 Kafka
 
@@ -82,6 +111,24 @@ curl -u user:user123 \
   http://localhost:8080/api/orders/preview
 ```
 
+Kafka demo lab：
+
+```bash
+curl -u user:user123 -X POST http://localhost:8080/api/kafka-demo/state/reset
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/basic?key=demo-basic'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/duplicates?eventId=demo-dup-1&key=demo-dup'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/ordered?key=order-1001&count=3'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/retry-topic?key=retry-1001&failUntilAttempt=2'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/lag?key=lag-1001&count=20&processingDelayMs=200'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/schema-v2?key=schema-1001'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/transaction/commit?key=tx-commit-1001'
+curl -u user:user123 -X POST 'http://localhost:8080/api/kafka-demo/transaction/abort?key=tx-abort-1001'
+curl -u user:user123 http://localhost:8080/api/kafka-demo/state
+curl -u user:user123 'http://localhost:8080/api/kafka-demo/capacity-plan?peakMessagesPerSecond=5000&consumerMessageCostMs=20&targetPartitionThroughput=1000'
+curl -u user:user123 http://localhost:8080/api/kafka-demo/security-template
+curl -u user:user123 http://localhost:8080/api/kafka-demo/selection-matrix
+```
+
 查看指标：
 
 ```bash
@@ -105,6 +152,7 @@ curl -u user:user123 http://localhost:8080/actuator/metrics/orders.preview.kafka
 - 重复 eventId 只处理一次。
 - 同一 key 的多条消息按顺序消费。
 - poison SKU 重试后进入 DLT，并保留原始 topic、partition、offset 和异常 header。
+- demo lab 覆盖重复消费、同 key 顺序、Schema V2 兼容、lag 慢消费、retry topic 到 DLT、事务 commit 可见和 abort 不可见。
 
 ## 核心配置
 
@@ -120,6 +168,14 @@ curl -u user:user123 http://localhost:8080/actuator/metrics/orders.preview.kafka
 | `ORDER_KAFKA_LISTENER_CONCURRENCY` | `3` | listener 并发度 |
 | `ORDER_KAFKA_RETRY_BACKOFF` | `100ms` | 消费失败重试间隔 |
 | `ORDER_KAFKA_RETRY_MAX_ATTEMPTS` | `1` | DLT 前重试次数 |
+| `KAFKA_DEMO_TOPIC` | `spring3.kafka-demo.events.v1` | demo lab 基础 topic |
+| `KAFKA_DEMO_RETRY_INPUT_TOPIC` | `spring3.kafka-demo.retry.input.v1` | demo retry 输入 topic |
+| `KAFKA_DEMO_RETRY_TOPIC` | `spring3.kafka-demo.retry.wait.v1` | demo retry topic |
+| `KAFKA_DEMO_RETRY_DLT_TOPIC` | `spring3.kafka-demo.retry.dlt.v1` | demo retry DLT |
+| `KAFKA_DEMO_SCHEMA_TOPIC` | `spring3.kafka-demo.schema.v1` | demo Schema 兼容 topic |
+| `KAFKA_DEMO_TX_INPUT_TOPIC` | `spring3.kafka-demo.tx.input.v1` | demo 事务输入 topic |
+| `KAFKA_DEMO_TX_AUDIT_TOPIC` | `spring3.kafka-demo.tx.audit.v1` | demo 事务审计 topic |
+| `KAFKA_DEMO_LAG_TOPIC` | `spring3.kafka-demo.lag.v1` | demo lag topic |
 
 Producer 可靠性配置：
 

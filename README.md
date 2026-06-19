@@ -156,6 +156,8 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - Spring Cloud Contract：已补充 `catalog-service` provider 契约、生成 stubs jar、`order-service` consumer Stub Runner 测试，覆盖成功、商品不存在和模拟失败三类下游响应。
 - RabbitMQ 消息队列：已新增可选 `rabbitmq` Maven/Spring profile、本地 Compose、订单预览事件发布/消费、eventId 幂等、消费重试和 DLQ，以及 Testcontainers 集成测试；默认运行路径不引入 MQ。
 - Kafka 消息队列：已新增可选 `kafka` Maven/Spring profile、本地 Compose、订单预览事件发布/消费、message key 分区顺序、manual ack、eventId 幂等、消费重试和 DLT，以及 Testcontainers 集成测试；默认运行路径不引入 Kafka。
+- Kafka demo lab：已新增 `/api/kafka-demo` 代码演示，覆盖 Kafka 基础模型、重复消费、幂等、顺序、retry topic、DLT、lag、rebalance 状态、Schema V2 兼容、事务 commit/abort 可见性、安全模板、容量规划和 Kafka/RabbitMQ/RocketMQ 选型。
+- Kafka 资深学习与面试：已补 [Kafka 资深后端学习指南](docs/kafka-learning-guide.md)、[Kafka 项目场景实施文档](docs/kafka-project-scenarios.md)、[Kafka 资深后端面试追问题库](docs/kafka-interview-question-bank.md)、[Kafka 运维排障 Runbook](docs/kafka-operations-runbook.md) 和 [Kafka 资深面试覆盖度复查](docs/kafka-coverage-review.md)，覆盖基础、使用、生产语义、排障和 30 个资深面试追问链路。
 - 消息队列生产语义：已补充 Kafka/RabbitMQ/RocketMQ 的可靠投递、顺序、幂等、重试、DLT/DLQ、lag/堆积排查和事务边界，见 [消息队列生产语义专题](docs/messaging-production-playbook.md)。
 - Native Image / AOT：已补充 `catalog-service` AOT、Docker buildpacks native 镜像、容器启动和 health check 闭环；当前本机 `native:compile` 仍阻塞于未安装 GraalVM `native-image`，但 buildpacks 路径已验证通过。
 - Kubernetes：已新增 `deployment/k8s` 最小部署示例，覆盖 Namespace、ConfigMap、Secret 示例、Deployment、Service、Actuator readiness/liveness、资源 requests/limits、滚动发布、优雅停机和 Prometheus 抓取注解。
@@ -218,6 +220,11 @@ Prometheus 在 Docker 中通过 `host.docker.internal:8080`、`host.docker.inter
 - [消息队列后续计划](docs/messaging-roadmap.md)
 - [消息队列生产语义专题](docs/messaging-production-playbook.md)
 - [Kafka 使用与面试专题](docs/kafka-playbook.md)
+- [Kafka 资深后端学习指南](docs/kafka-learning-guide.md)
+- [Kafka 项目场景实施文档](docs/kafka-project-scenarios.md)
+- [Kafka 资深后端面试追问题库](docs/kafka-interview-question-bank.md)
+- [Kafka 运维排障 Runbook](docs/kafka-operations-runbook.md)
+- [Kafka 资深面试覆盖度复查](docs/kafka-coverage-review.md)
 - [Kafka 专题计划](docs/task-plans/18-kafka.md)
 - [消息队列生产语义计划](docs/task-plans/24-messaging-production.md)
 - [JVM、并发和 Java 21 诊断计划](docs/task-plans/25-jvm-concurrency.md)

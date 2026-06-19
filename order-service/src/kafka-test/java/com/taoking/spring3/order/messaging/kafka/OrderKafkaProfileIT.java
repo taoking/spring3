@@ -69,6 +69,20 @@ class OrderKafkaProfileIT {
     private static final String RETRY_TOPIC = TOPIC + ".retry";
     private static final String DLT_TOPIC = TOPIC + ".dlt";
     private static final String GROUP_ID = "spring3-order-preview-it-" + UUID.randomUUID();
+    private static final String DEMO_TOPIC = "spring3.kafka-demo.events.it-" + UUID.randomUUID();
+    private static final String DEMO_RETRY_INPUT_TOPIC = DEMO_TOPIC + ".retry.input";
+    private static final String DEMO_RETRY_TOPIC = DEMO_TOPIC + ".retry.wait";
+    private static final String DEMO_RETRY_DLT_TOPIC = DEMO_TOPIC + ".retry.dlt";
+    private static final String DEMO_SCHEMA_TOPIC = DEMO_TOPIC + ".schema";
+    private static final String DEMO_TX_INPUT_TOPIC = DEMO_TOPIC + ".tx.input";
+    private static final String DEMO_TX_AUDIT_TOPIC = DEMO_TOPIC + ".tx.audit";
+    private static final String DEMO_LAG_TOPIC = DEMO_TOPIC + ".lag";
+    private static final String DEMO_GROUP_ID = "spring3-kafka-demo-it-" + UUID.randomUUID();
+    private static final String DEMO_RETRY_GROUP_ID = "spring3-kafka-demo-retry-it-" + UUID.randomUUID();
+    private static final String DEMO_SCHEMA_GROUP_ID = "spring3-kafka-demo-schema-it-" + UUID.randomUUID();
+    private static final String DEMO_TX_GROUP_ID = "spring3-kafka-demo-tx-it-" + UUID.randomUUID();
+    private static final String DEMO_LAG_GROUP_ID = "spring3-kafka-demo-lag-it-" + UUID.randomUUID();
+    private static final String DEMO_TX_PREFIX = "spring3-kafka-demo-it-tx-" + UUID.randomUUID() + "-";
 
     @Container
     static final ConfluentKafkaContainer kafka = new ConfluentKafkaContainer(KAFKA_IMAGE);
@@ -94,6 +108,12 @@ class OrderKafkaProfileIT {
     private InMemoryProcessedKafkaEventStore processedEventStore;
 
     @Autowired
+    private KafkaDemoScenarioService demoScenarios;
+
+    @Autowired
+    private KafkaDemoState demoState;
+
+    @Autowired
     private CircuitBreakerRegistry circuitBreakerRegistry;
 
     @BeforeAll
@@ -115,11 +135,26 @@ class OrderKafkaProfileIT {
         registry.add("demo.messaging.kafka.dead-letter-topic", () -> DLT_TOPIC);
         registry.add("demo.messaging.kafka.consumer-group", () -> GROUP_ID);
         registry.add("demo.clients.catalog.base-url", () -> catalogServer.url("/").toString().replaceAll("/$", ""));
+        registry.add("demo.kafka.examples.topic", () -> DEMO_TOPIC);
+        registry.add("demo.kafka.examples.retry-input-topic", () -> DEMO_RETRY_INPUT_TOPIC);
+        registry.add("demo.kafka.examples.retry-topic", () -> DEMO_RETRY_TOPIC);
+        registry.add("demo.kafka.examples.retry-dlt-topic", () -> DEMO_RETRY_DLT_TOPIC);
+        registry.add("demo.kafka.examples.schema-topic", () -> DEMO_SCHEMA_TOPIC);
+        registry.add("demo.kafka.examples.transaction-input-topic", () -> DEMO_TX_INPUT_TOPIC);
+        registry.add("demo.kafka.examples.transaction-audit-topic", () -> DEMO_TX_AUDIT_TOPIC);
+        registry.add("demo.kafka.examples.lag-topic", () -> DEMO_LAG_TOPIC);
+        registry.add("demo.kafka.examples.consumer-group", () -> DEMO_GROUP_ID);
+        registry.add("demo.kafka.examples.retry-consumer-group", () -> DEMO_RETRY_GROUP_ID);
+        registry.add("demo.kafka.examples.schema-consumer-group", () -> DEMO_SCHEMA_GROUP_ID);
+        registry.add("demo.kafka.examples.transaction-consumer-group", () -> DEMO_TX_GROUP_ID);
+        registry.add("demo.kafka.examples.lag-consumer-group", () -> DEMO_LAG_GROUP_ID);
+        registry.add("demo.kafka.examples.transaction-id-prefix", () -> DEMO_TX_PREFIX);
     }
 
     @BeforeEach
     void resetState() {
         consumer.resetState();
+        demoState.reset();
         circuitBreakerRegistry.getAllCircuitBreakers().forEach(circuitBreaker -> circuitBreaker.reset());
     }
 
@@ -198,6 +233,53 @@ class OrderKafkaProfileIT {
         assertThat(headerValue(deadLetter, KafkaHeaders.DLT_EXCEPTION_CAUSE_FQCN))
                 .isEqualTo(IllegalStateException.class.getName());
         assertThat(consumer.hasProcessed(eventId)).isFalse();
+    }
+
+    @Test
+    void kafkaDemoScenariosCoverDuplicatesOrderingSchemaAndLag() {
+        String duplicateEventId = "demo-duplicate-" + UUID.randomUUID();
+        String orderedKey = "demo-order-" + UUID.randomUUID();
+        String lagKey = "demo-lag-" + UUID.randomUUID();
+
+        demoScenarios.publishDuplicate(duplicateEventId, duplicateEventId);
+        List<KafkaDemoEvent> orderedEvents = demoScenarios.publishOrdered(orderedKey, 3);
+        String schemaEventId = demoScenarios.publishSchemaV2("schema-key-" + UUID.randomUUID());
+        demoScenarios.publishLag(lagKey, 3, 10);
+
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
+            assertThat(demoState.hasConsumed(duplicateEventId)).isTrue();
+            assertThat(demoState.duplicateCount()).isEqualTo(1);
+            assertThat(demoState.orderedEventIdsForKey(orderedKey))
+                    .containsExactlyElementsOf(orderedEvents.stream().map(KafkaDemoEvent::eventId).toList());
+            assertThat(demoState.hasSchemaAccepted(schemaEventId)).isTrue();
+            assertThat(demoState.lagProcessedCount()).isGreaterThanOrEqualTo(3);
+        });
+    }
+
+    @Test
+    void kafkaDemoRetryTopicPublishesToRetryDeadLetterTopic() {
+        KafkaDemoEvent event = demoScenarios.publishRetryTopic("demo-retry-" + UUID.randomUUID(), 2);
+
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
+            assertThat(demoState.hasRetryDlt(event.eventId())).isTrue();
+            assertThat(demoState.retryAttempts(event.eventId())).isEqualTo(3);
+        });
+    }
+
+    @Test
+    void kafkaDemoTransactionCommitIsVisibleAndAbortIsHidden() throws Exception {
+        KafkaDemoEvent committed = demoScenarios.publishCommittedTransaction("demo-tx-" + UUID.randomUUID());
+
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> {
+            assertThat(demoState.hasTransactionInput(committed.eventId())).isTrue();
+            assertThat(demoState.hasTransactionAudit(committed.eventId())).isTrue();
+        });
+
+        KafkaDemoEvent aborted = demoScenarios.publishAbortedTransaction("demo-tx-" + UUID.randomUUID());
+        Thread.sleep(1500);
+
+        assertThat(demoState.hasTransactionInput(aborted.eventId())).isFalse();
+        assertThat(demoState.hasTransactionAudit(aborted.eventId())).isFalse();
     }
 
     private ResponseEntity<OrderPreviewResponse> postPreview(String sku, String requestId, String traceId) {

@@ -42,7 +42,7 @@ SPRING_PROFILES_ACTIVE=rabbitmq ./mvnw -Prabbitmq -pl order-service spring-boot:
 
 适合高吞吐、日志流、事件流、数据管道和需要持久化顺序消费的场景。
 
-详细执行计划、任务 prompt、场景拆分、事件设计、测试验收和面试追问见 [Kafka 专题计划](task-plans/18-kafka.md)，本地运行和面试复盘见 [Kafka 使用与面试专题](kafka-playbook.md)。
+详细执行计划、任务 prompt、场景拆分、事件设计、测试验收和面试追问见 [Kafka 专题计划](task-plans/18-kafka.md)，本地运行和面试复盘见 [Kafka 使用与面试专题](kafka-playbook.md)。资深学习和面试深化见 [Kafka 资深后端学习指南](kafka-learning-guide.md)、[Kafka 项目场景实施文档](kafka-project-scenarios.md)、[Kafka 资深后端面试追问题库](kafka-interview-question-bank.md)、[Kafka 运维排障 Runbook](kafka-operations-runbook.md) 和 [Kafka 资深面试覆盖度复查](kafka-coverage-review.md)。
 
 当前 Kafka 示例：
 
@@ -55,7 +55,8 @@ SPRING_PROFILES_ACTIVE=rabbitmq ./mvnw -Prabbitmq -pl order-service spring-boot:
 | 幂等 | `ProcessedKafkaEventStore` 基于 eventId 做内存去重，重复消息跳过并 ack |
 | 重试/DLT | `DefaultErrorHandler` + `DeadLetterPublishingRecoverer`，消费失败重试后进入 DLT |
 | 指标 | 发布、发送失败、消费成功、重复、失败分别有 Micrometer Counter |
-| 测试 | `OrderKafkaProfileIT` 使用 Testcontainers Kafka 覆盖生产消费、幂等、同 key 顺序和 DLT |
+| demo lab | `/api/kafka-demo` 覆盖基础模型、重复消费、幂等、顺序、retry topic、DLT、lag、rebalance、Schema、事务、安全、容量和选型 |
+| 测试 | `OrderKafkaProfileIT` 使用 Testcontainers Kafka 覆盖生产消费、幂等、同 key 顺序、DLT 和 demo lab |
 
 生产语义已补充：
 
@@ -63,12 +64,14 @@ SPRING_PROFILES_ACTIVE=rabbitmq ./mvnw -Prabbitmq -pl order-service spring-boot:
 - retry topic 和 blocking retry 的取舍。
 - consumer lag 面板、rebalance 排查和 partition skew 诊断。
 - Schema Registry、Avro/Protobuf/JSON Schema 的长期兼容治理。
+- Kafka 资深面试 30 个追问链路、项目表达模板和已落地/设计型能力边界。
+- DLT 安全重放、producer 失败、broker 故障和 consumer lag runbook。
 
-建议后续示例：
+建议后续生产化增强：
 
-- 增加 Kafka producer transaction 的最小 read-process-write 示例。
-- 使用 retry topic 替换当前 blocking retry，比较两种方案对 partition 后续消息的影响。
-- 增加 consumer lag 查询命令和 Grafana 面板。
+- 增加完整 Kafka 内 read-process-write EOS 示例，把 output topic 和 consumed offset 放入同一事务。
+- 增加 DLT dry run、限速、审计和防循环重放工具。
+- 增加 consumer lag 查询命令、PromQL 和 Grafana 面板。
 
 ## RabbitMQ
 

@@ -31,7 +31,7 @@
 | P1 | API 治理 | API versioning、统一错误码、OpenAPI 分组、接口兼容性体现长期维护能力 | 已完成 ProblemDetail 错误码、订单 v1/v2、旧接口废弃头、OpenAPI 分组和测试 |
 | P1 | Spring Cloud Contract | 微服务 provider/consumer 变更风险控制 | 已完成 catalog provider 契约、stubs jar、本地 Stub Runner consumer 测试，覆盖成功、404、500 三类响应 |
 | P1 | 工程质量与 CI 门禁 | 资深工程负责人会被追问质量、依赖安全、架构规则和发布门禁 | 已补 [工程质量与 CI 门禁专题](engineering-quality-playbook.md)，覆盖 CI 分层、JaCoCo、静态扫描、依赖安全、SBOM、镜像扫描和 ArchUnit 规则候选 |
-| P2 | 消息队列 | Kafka/RabbitMQ/RocketMQ 的投递语义、幂等、重试、顺序消息 | 已完成 RabbitMQ/Kafka 可选 profile 和 Testcontainers；已补 [消息队列生产语义专题](messaging-production-playbook.md)，覆盖 Kafka lag/rebalance/retry topic/transaction 边界、RabbitMQ confirm/manual ack/prefetch 和 RocketMQ 设计对比 |
+| P2 | 消息队列 | Kafka/RabbitMQ/RocketMQ 的投递语义、幂等、重试、顺序消息 | 已完成 RabbitMQ/Kafka 可选 profile、Testcontainers 和 `/api/kafka-demo` 演示端点；已补 [消息队列生产语义专题](messaging-production-playbook.md)，并补齐 [Kafka 资深后端学习指南](kafka-learning-guide.md)、[Kafka 项目场景实施文档](kafka-project-scenarios.md)、[Kafka 资深后端面试追问题库](kafka-interview-question-bank.md)、[Kafka 运维排障 Runbook](kafka-operations-runbook.md) 和 [Kafka 资深面试覆盖度复查](kafka-coverage-review.md) |
 | P2 | Testcontainers | 集成测试、外部依赖隔离、CI 可重复性 | 已完成 Gateway 下游容器集成测试和 GitHub Actions；后续可扩展到 Nacos |
 | P2 | Native Image/AOT | Spring Boot 3 亮点之一，适合了解限制和收益 | 已补专题文档和 [Native Image 完整验证专题](native-image-verification-playbook.md)，`catalog-service` buildpacks native 镜像、容器启动和 health check 已通过；本机 `native:compile` 仍阻塞于缺少 GraalVM `native-image` |
 | P2 | Kubernetes | 部署、探针、滚动发布、配置注入会被问，但本项目不急于维护完整平台 | 已补最小 YAML；已补 [Kubernetes 生产化专题](kubernetes-production-playbook.md)，覆盖 Ingress、HPA、PDB、ServiceMonitor、Secret 管理、镜像 tag/digest、GitOps、回滚和故障排查 |
@@ -55,6 +55,7 @@
 - 能说明错误码稳定性、API 版本兼容、废弃接口 Sunset 策略和 OpenAPI 分组方式。
 - 能说明 Spring Cloud Contract 和 MockWebServer 的区别，以及 provider stubs 如何被 consumer CI 使用。
 - 能说明 RabbitMQ exchange/queue/binding、ack/nack、listener retry、DLQ、publisher confirm 和消费幂等的边界，并能和 Kafka/RocketMQ 对比。
+- 能说明 Kafka topic/partition/offset/group、producer 可靠性、manual ack、重复消费、顺序、幂等、retry topic、DLT、lag、rebalance、Schema 演进、事务边界和安全重放。
 - 能说明 outbox/inbox、幂等表、DLQ/DLT 重放、对账和补偿如何共同保证最终一致性。
 - 能说明 AOT 和 Native Image 的区别、收益、代价，以及 Hibernate Validator RuntimeHints、反射、动态代理、SpringDoc、Sentry、Feign 在 native 场景下为什么要单独验证。
 - 能说明服务注册和配置中心在故障场景下的降级策略。
